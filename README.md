@@ -1,166 +1,127 @@
-## Architect's Domain
+## Preview
 
-**Local-first • Multi-model • BYOAK AI Workstation for Power Users**
+![Architect's Domain UI](assets/main-ui.png)
 
-![Architect's Domain](assets/main-ui.png)
+# Architect's Domain
 
-> A privacy-first, hackable AI cockpit that lets you switch between frontier models instantly, maintain persistent memory across chats, and experiment freely — all while keeping your API keys and data under your control.
+Architect's Domain is a local first multi-model AI workstation built for power users, prompt engineers, roleplay creators, and AI explorers.
 
-**Status:** Public Beta • Actively evolving
+The project started as a single experimental HTML file and evolved into a modular AI cockpit with persistent memory, streaming chat, provider switching, markdown rendering, and BYOAK architecture.
 
----
+## Features
 
-## ✨ Why Architect's Domain?
+* Multi-provider support
 
-Most AI chat tools force you into one ecosystem. Architect's Domain is different:
+  * OpenRouter
+  * Venice.ai
+  * DeepSeek
 
-- **True local-first** — runs anywhere (GitHub Pages, Netlify, localhost, even offline with local models)
-- **BYOAK (Bring Your Own API Keys)** — zero backend, zero secrets in the repo
-- **Multi-provider freedom** — OpenRouter, Venice.ai, DeepSeek, and soon Ollama / LM Studio
-- **Persistent contextual memory** — pin important context that follows you across every model and conversation
-- **Built for power users** — prompt engineers, roleplay creators, researchers, and tinkerers
+* BYOAK architecture
 
-No accounts. No tracking. No vendor lock-in.
+  * Users bring their own API keys
+  * No backend secrets required
+  * Keys stay inside browser localStorage
 
----
+* Persistent pinned memory
 
-## 🚀 Quick Start
+  * Per-chat contextual memory
+  * Injected silently into requests
+  * Works across providers and models
 
-### Web Version (Easiest)
-1. Visit the live demo (coming soon)
-2. Add your API keys in Settings
-3. Start chatting with pinned memory enabled
+* Streaming chat system
 
-### Run Locally
-```bash
-git clone https://github.com/HactoriXD/architects-domain.git
-cd architects-domain
-node server.js
-# Open http://localhost:3000
+  * Buffered SSE streaming
+  * Stable stream ownership
+  * Safe chat switching during generation
+  * Preserved partial outputs on stop
+
+* Advanced markdown rendering
+
+  * Fenced code blocks
+  * Syntax highlighting
+  * Inline formatting
+  * Better whitespace preservation
+
+* Daily cockpit UX
+
+  * Conversation navigation shortcuts
+  * Pinned context controls
+  * Export/import support
+  * Multi-chat workflow
+
+* Local-first architecture
+
+  * Static host compatible
+  * No required database
+  * No required authentication
+  * Portable and hackable
+
+## Philosophy
+
+Architect's Domain is designed as an AI workstation instead of a minimal chatbot.
+
+The goal is to create a flexible environment where users can:
+
+* switch between providers instantly
+* preserve context and memory
+* experiment with prompts
+* build characters and systems
+* use frontier models without platform lock-in
+
+## Tech Stack
+
+Frontend:
+
+* HTML
+* CSS
+* Vanilla JavaScript
+
+Architecture:
+
+* Modular file structure
+* Static-host compatible
+* BYOAK provider flow
+
+Providers:
+
+* OpenRouter
+* Venice.ai
+* DeepSeek
+
+## Project Structure
+
+```text
+/styles
+/scripts
+index.html
+server.js
+package.json
 ```
 
-### Desktop App (New in v0.2)
-```bash
-# Install Tauri CLI
-npm install -g @tauri-apps/cli
+## Hosting
 
-# Run in development
-npm run tauri:dev
+Architect's Domain can be hosted on:
 
-# Build production app
-npm run tauri:build
-```
+* GitHub Pages
+* Netlify
+* Cloudflare Pages
+* Vercel static hosting
+* Any static web server
 
-The desktop app will be available as `.exe`, `.dmg`, `.AppImage`, and `.deb`.
+## Security Model
 
----
+This project uses a strict BYOAK model.
 
-## ✨ Core Features
+Users provide their own API keys locally. Keys are stored in browser localStorage and sent directly to the selected provider.
 
-### Smart Router (v0.2)
-- Automatically recommends the best model for your prompt
-- Shows real-time cost estimate and context window
-- One-click apply
-- Works with cloud + local models
+The repository does not contain provider secrets.
 
-### Local Model Support (v0.2)
-- Native Ollama support (localhost:11434)
-- Native LM Studio support (localhost:1234)
-- Automatic detection
+## Status
 
-### Multi-Provider Support
-- OpenRouter
-- Venice.ai
-- DeepSeek
-- Local (Ollama / LM Studio)
+Public beta.
 
-### BYOAK Architecture
-- API keys stored only in your browser (localStorage)
-- Keys never leave your device except to the provider you choose
+The project is actively evolving and focused on experimentation, usability, and AI workflow design.
 
-### Intelligent Memory System
-- Per-chat **pinned memory** that is silently injected into every request
-- Works across all providers and models
+## License
 
-### Streaming & UX
-- Smooth buffered SSE streaming
-- Safe chat switching mid-generation
-- Advanced markdown with syntax highlighting
-
-### Cockpit Workflow
-- Multi-chat navigation
-- Keyboard shortcuts everywhere
-- Export / import conversations
-
----
-
-## 🗺️ Roadmap
-
-### v0.3 (Coming Soon)
-- Conversation branching / tree view
-- Semantic memory search
-- Theming system + Focus Mode
-- Full Tauri desktop polish
-
-### v1.0
-- Plugin system
-- Public release + community features
-
----
-
-## 🛠️ Development
-
-### Tech Stack
-- **Frontend**: Vanilla HTML + CSS + JavaScript
-- **Desktop**: Tauri (Rust)
-- **Architecture**: Modular, local-first
-
-### Project Structure
-```
-architects-domain/
-├── index.html
-├── server.js
-├── package.json
-├── src-tauri/          # Desktop app (Rust + Tauri)
-├── scripts/            # JS modules
-├── styles/
-└── README.md
-```
-
-### Local Development
-```bash
-node server.js
-```
-
-### Building Desktop App
-```bash
-# Install dependencies
-npm install
-
-# Development mode
-npm run tauri:dev
-
-# Production build
-npm run tauri:build
-```
-
----
-
-## 🔒 Security & Privacy
-- **Strict BYOAK** — your keys never touch our servers
-- Keys live only in browser localStorage
-- All communication goes directly from your browser to the AI provider
-- No analytics, no telemetry, no accounts
-- Open source — audit everything
-
----
-
-## 📜 License
-
-MIT License
-
----
-
-**Built with ❤️ for power users who refuse to be locked in.**
-
-*Last updated: May 2026*
+No license yet.

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Architect's Domain &mdash; AI Workstation</title>
+    <title>Architect's Domain &mdash; OpenRouter Interface</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -14,37 +14,21 @@
     <link rel="stylesheet" href="styles/chat.css">
     <link rel="stylesheet" href="styles/markdown.css">
     <link rel="stylesheet" href="styles/animations.css">
+    <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#050505">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Architect's Domain">
+    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkFyY2hpdGVjdCdzIERvbWFpbiIsCiAgInNob3J0X25hbWUiOiAiQXJjaGl0ZWN0IiwKICAiZGVzY3JpcHRpb24iOiAiQSBwb3dlcmZ1bCBBSSBjaGF0IGludGVyZmFjZSIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDUwNTA1IiwKICAidGhlbWVfY29sb3IiOiAiIzhiNWNmNiIsCiAgImljb25zIjogW3sKICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sLCUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nbm9uZScgc3Ryb2tlPSclMjM4YjVjZjYnIHN0cm9rZS13aWR0aD0nMiclM0UlM0Nwb2x5Z29uIHBvaW50cz0nMTIgMiAxNS4wOSA4LjI2IDIyIDkuMjcgMTcgMTQuMTQgMTguMTggMjEuMDIgMTIgMTcuNzcgNS44MiAyMS4wMiA3IDE0LjE0IDIgOS4yNyA4LjkxIDguMjYgMTIgMicvJTNFJTNDL3N2ZyUzRSIsCiAgICAic2l6ZXMiOiAiYW55IiwKICAgICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiCiAgfV0KfQ==">
 </head>
 <body>
-    <!-- Real Onboarding Modal -->
-    <div class="modal-overlay" id="onboardingModal" style="display:none">
-        <div class="modal onboarding-modal">
-            <div class="onboarding-header">
-                <div class="logo-icon large"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-                <h2>Welcome to Architect's Domain v0.2</h2>
-                <p class="onboarding-subtitle">Local-first • Multi-model • Smart AI Workstation</p>
-            </div>
-            <div class="onboarding-features">
-                <div class="feature-item"><div class="feature-icon">🔑</div><div><strong>BYOAK</strong><p>Your keys stay in your browser. No tracking, no lock-in.</p></div></div>
-                <div class="feature-item"><div class="feature-icon">🧠</div><div><strong>Persistent Memory</strong><p>Pin context that follows every conversation.</p></div></div>
-                <div class="feature-item"><div class="feature-icon">⚡</div><div><strong>Smart Router (New)</strong><p>Auto-recommends best model + shows real cost.</p></div></div>
-                <div class="feature-item"><div class="feature-icon">💻</div><div><strong>Local Models</strong><p>Ollama & LM Studio support — fully offline.</p></div></div>
-            </div>
-            <div class="onboarding-actions">
-                <button class="btn btn-primary btn-large" id="onboardingStartBtn">Get Started</button>
-                <button class="btn" id="onboardingSkipBtn">Skip</button>
-            </div>
-        </div>
-    </div>
-
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">
                 <div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-                <span class="logo-text">Architect's Domain <span class="version-badge">v0.2</span></span>
-                <button class="sidebar-close" id="sidebarClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                <span class="logo-text">Architect's Domain</span>
+                <button class="sidebar-close" id="sidebarClose" title="Close sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <button class="new-chat-btn" id="newChatBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Ritual</button>
         </div>
@@ -61,50 +45,201 @@
                 <button class="sidebar-toggle" id="sidebarToggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
                 <div class="model-selector-container">
                     <button class="model-selector-button" id="modelSelectorBtn">
-                        <div class="model-info">
-                            <span class="model-provider" id="selectedProviderName">OpenRouter</span>
-                            <span class="model-separator">&middot;</span>
-                            <span class="model-name" id="selectedModelName">Loading...</span>
-                            <span class="model-stats" id="modelStats">
-                                <span class="context-window" id="contextWindow">128k</span>
-                                <span class="cost-estimate" id="costEstimate">~$0.00</span>
-                            </span>
-                        </div>
+                        <div class="model-info"><span class="model-provider" id="selectedProviderName">OpenRouter</span><span class="model-separator">&middot;</span><span class="model-name" id="selectedModelName">Loading...</span><span class="vision-badge" id="visionBadge" style="display:none">Vision</span></div>
                         <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
-                    <div class="model-dropdown" id="modelDropdown">...</div>
+                    <div class="model-dropdown" id="modelDropdown">
+                        <div class="model-search-container">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" class="model-search" id="modelSearch" placeholder="Search models...">
+                        </div>
+                        <div class="model-filter-row" id="modelFilterRow">
+                            <button class="model-filter-chip active" data-filter="all" type="button">All</button>
+                            <button class="model-filter-chip" data-filter="free" type="button">Free</button>
+                            <button class="model-filter-chip" data-filter="vision" type="button">Vision</button>
+                            <button class="model-filter-chip" data-filter="reasoning" type="button">Reasoning</button>
+                            <button class="model-filter-chip" data-filter="coding" type="button">Coding</button>
+                            <button class="model-filter-chip" data-filter="roleplay" type="button">Roleplay</button>
+                        </div>
+                        <div class="model-list" id="modelList"><div class="loading-models"><div class="spinner"></div><span>Loading models...</span></div></div>
+                    </div>
                 </div>
             </div>
-            <div class="header-controls">...</div>
+            <div class="header-controls">
+                <button class="websearch-toggle" id="webSearchToggle" type="button" title="Toggle web search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    <span class="websearch-label">Websearch</span>
+                    <span id="webSearchStatus">Off</span>
+                    <span class="toggle-track" aria-hidden="true"></span>
+                </button>
+                <!-- Export -->
+                <div class="export-toggle">
+                    <button class="btn btn-icon" id="exportBtn" title="Export chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                    <div class="export-panel" id="exportPanel">
+                        <h3 class="settings-title">Export Chat</h3>
+                        <button class="export-option" onclick="exportAsMarkdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Markdown (.md)</button>
+                        <button class="export-option" onclick="exportAsJSON()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>JSON (.json)</button>
+                        <button class="export-option" onclick="exportAsText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Plain Text (.txt)</button>
+                        <button class="export-option" onclick="exportAsHTML()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>HTML (.html)</button>
+                    </div>
+                </div>
+                <!-- Keyboard shortcuts -->
+                <button class="btn btn-icon" id="shortcutsBtn" title="Keyboard shortcuts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="M6 8h.001"/><path d="M10 8h.001"/><path d="M14 8h.001"/><path d="M18 8h.001"/><path d="M8 12h.001"/><path d="M12 12h.001"/><path d="M16 12h.001"/><line x1="6" y1="16" x2="18" y2="16"/></svg></button>
+                <!-- Settings -->
+                <div class="settings-toggle">
+                    <button class="btn btn-icon" id="settingsBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                    <div class="settings-panel" id="settingsPanel">
+                        <h3 class="settings-title">Providers</h3>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>API Provider</span></div>
+                            <select class="settings-select" id="providerSelect">
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="venice">Venice.ai</option>
+                            </select>
+                            <div class="settings-hint">Your API keys remain locally stored in your browser and are sent directly to the selected provider.</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Local API Key</span><span class="provider-status" id="providerStatus">Not tested</span></div>
+                            <input type="password" class="settings-input" id="apiKeyInput" placeholder="Enter API key for selected provider" autocomplete="off">
+                            <div class="settings-hint">Your API keys remain locally stored in your browser and are sent directly to the selected provider.</div>
+                            <div class="provider-actions">
+                                <button class="btn" id="testProviderBtn" type="button">Test Connection</button>
+                                <button class="btn" id="clearLocalKeysBtn" type="button">Clear Local Keys</button>
+                            </div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Settings Backup</span></div>
+                            <div class="provider-actions">
+                                <button class="btn" id="exportSettingsBtn" type="button">Encrypted Export</button>
+                                <button class="btn" id="importSettingsBtn" type="button">Encrypted Import</button>
+                                <input type="file" id="settingsImportInput" accept="application/json,.json" style="display:none">
+                            </div>
+                            <div class="settings-hint">Optional encrypted backup for local provider keys and generation settings.</div>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <h3 class="settings-title">Generation Settings</h3>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Temperature</span><span class="settings-value" id="tempValue">0.7</span></div>
+                            <input type="range" class="settings-slider" id="tempSlider" min="0" max="2" step="0.1" value="0.7">
+                            <div class="settings-hint">Lower = focused, Higher = creative</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Max Output Tokens</span><span class="settings-value" id="maxTokensValue">8,192</span></div>
+                            <input type="range" class="settings-slider" id="maxTokensSlider" min="256" max="64000" step="256" value="8192">
+                            <div class="settings-hint">Maximum response length</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Top P</span><span class="settings-value" id="topPValue">1.00</span></div>
+                            <input type="range" class="settings-slider" id="topPSlider" min="0" max="1" step="0.01" value="1">
+                            <div class="settings-hint">Nucleus sampling threshold</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Top K</span><span class="settings-value" id="topKValue">0</span></div>
+                            <input type="range" class="settings-slider" id="topKSlider" min="0" max="100" step="1" value="0">
+                            <div class="settings-hint">0 = disabled, limits token choices</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Frequency Penalty</span><span class="settings-value" id="freqPenaltyValue">0.0</span></div>
+                            <input type="range" class="settings-slider" id="freqPenaltySlider" min="0" max="2" step="0.1" value="0">
+                            <div class="settings-hint">Reduces repetition of tokens</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Presence Penalty</span><span class="settings-value" id="presPenaltyValue">0.0</span></div>
+                            <input type="range" class="settings-slider" id="presPenaltySlider" min="0" max="2" step="0.1" value="0">
+                            <div class="settings-hint">Encourages new topics</div>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <button class="btn settings-reset-btn" id="resetSettingsBtn">Reset to Defaults</button>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main class="main-container">
-            <!-- Smart Router Suggestion Bar (Real Integration) -->
-            <div class="smart-suggestion-bar" id="smartSuggestionBar" style="display:none">
-                <div class="suggestion-content">
-                    <div class="suggestion-icon">⚡</div>
-                    <div class="suggestion-text">
-                        <span id="suggestionText">Smart Router recommends <strong id="suggestedModel"></strong></span>
-                        <span class="suggestion-meta" id="suggestionMeta">~ $0.00 • 128k context</span>
-                    </div>
+            <div class="system-prompt-container collapsed" id="systemPromptContainer">
+                <div class="system-prompt-header" id="systemPromptHeader">
+                    <div class="system-prompt-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span>System Prompt</span><span class="system-prompt-badge" id="systemPromptBadge" style="display:none">Active</span></div>
+                    <svg class="system-prompt-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
-                <div class="suggestion-actions">
-                    <button class="btn btn-sm" id="applySuggestionBtn">Apply</button>
-                    <button class="btn btn-sm btn-ghost" id="dismissSuggestionBtn">Dismiss</button>
+                <div class="system-prompt-body">
+                    <p class="system-prompt-description">Define the rules of this domain before the first invocation.</p>
+                    <div class="system-prompt-presets" id="systemPromptPresets">
+                        <button class="system-prompt-preset" data-preset="roleplay" type="button">Roleplay</button>
+                        <button class="system-prompt-preset" data-preset="coding" type="button">Coding</button>
+                        <button class="system-prompt-preset" data-preset="research" type="button">Research</button>
+                        <button class="system-prompt-preset" data-preset="journal" type="button">Journal</button>
+                        <button class="system-prompt-preset" data-preset="lorekeeper" type="button">Lorekeeper</button>
+                    </div>
+                    <textarea class="system-prompt-textarea" id="systemPrompt" placeholder="Write the law of the room..."></textarea>
+                    <div class="system-prompt-footer">
+                        <div class="system-prompt-stats"><span id="systemPromptWordCount">0</span> words &middot; <span id="systemPromptCharCount">0</span> chars</div>
+                        <div style="display:flex;align-items:center;gap:12px">
+                            <div class="system-prompt-saved" id="systemPromptSaved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>Saved</span></div>
+                            <div class="system-prompt-actions">
+                                <button class="btn" id="systemPromptClear"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
+                                <button class="btn btn-primary" id="systemPromptSave"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Apply</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="system-prompt-container collapsed" id="systemPromptContainer">...</div>
-            <div class="pinned-context-container collapsed" id="pinnedContextContainer">...</div>
+            <div class="pinned-context-container collapsed" id="pinnedContextContainer">
+                <div class="pinned-context-header" id="pinnedContextHeader">
+                    <div class="pinned-context-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v5"/><path d="M5 17h14"/><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 3L3 7l4 4"/></svg>
+                        <span>Pinned Context</span>
+                        <span class="pinned-context-badge" id="pinnedContextBadge">Active</span>
+                    </div>
+                    <svg class="pinned-context-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="pinned-context-body">
+                    <p class="pinned-context-description">Per-chat notes injected as context before each request. They stay out of the visible conversation.</p>
+                    <textarea class="pinned-context-textarea" id="pinnedContext" placeholder="Pin names, constraints, project facts, tone rules, or anything this chat must remember..."></textarea>
+                    <div class="pinned-context-footer">
+                        <div class="pinned-context-stats"><span id="pinnedContextWordCount">0</span> words &middot; <span id="pinnedContextCharCount">0</span> chars</div>
+                        <div class="pinned-context-actions">
+                            <div class="pinned-context-saved" id="pinnedContextSaved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>Saved</span></div>
+                            <button class="btn" id="pinnedContextClear"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
+                            <button class="btn btn-primary" id="pinnedContextSave"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="messages-container" id="messagesContainer">
                 <div class="empty-state" id="emptyState">
                     <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-                    <h2 class="empty-state-title">Welcome to Architect's Domain v0.2</h2>
-                    <p class="empty-state-subtitle">Type a message. Smart Router will suggest the best model.</p>
-                    <div class="quick-start-grid">...</div>
+                    <h2 class="empty-state-title">Welcome to Architect's Domain</h2>
+                    <p class="empty-state-subtitle">Select a model and send a message to begin. You can attach images and files.</p>
+                    <div class="quick-start-grid">
+                        <button class="quick-start-card" data-prompt="Begin a focused creative session. Ask me three questions, then help me turn the answers into a concrete plan.">
+                            <span class="quick-start-title">Start a Ritual</span>
+                            <span class="quick-start-desc">Open with questions, structure, and momentum.</span>
+                        </button>
+                        <button class="quick-start-card" data-prompt="Help me create a vivid character. Build their voice, wounds, desires, boundaries, contradictions, and first scene.">
+                            <span class="quick-start-title">Create a Character</span>
+                            <span class="quick-start-desc">Shape voice, motive, conflict, and scene hooks.</span>
+                        </button>
+                        <button class="quick-start-card" data-prompt="I will attach a file. Analyze it for structure, risks, missing pieces, and the most useful next actions.">
+                            <span class="quick-start-title">Analyze a File</span>
+                            <span class="quick-start-desc">Inspect documents, code, notes, or exports.</span>
+                        </button>
+                        <button class="quick-start-card" data-prompt="Brainstorm a domain for a project: name, aesthetic, core features, user rituals, and what makes it memorable.">
+                            <span class="quick-start-title">Brainstorm a Domain</span>
+                            <span class="quick-start-desc">Generate identity, product shape, and direction.</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="messages-list" id="messagesList" style="display:none"></div>
+            </div>
+
+            <button class="scroll-to-bottom" id="scrollToBottom"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg><span>Scroll to bottom</span></button>
+            <div class="conversation-nav" aria-label="Conversation navigation">
+                <button class="conversation-nav-btn" id="jumpLatestUser" title="Jump to latest user prompt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+                <button class="conversation-nav-btn" id="jumpLatestAssistant" title="Jump to latest assistant response"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>
+                <button class="conversation-nav-btn" id="jumpStreaming" title="Jump to current streaming response" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg></button>
             </div>
 
             <div class="input-container">
@@ -113,7 +248,13 @@
                     <div class="input-box">
                         <textarea class="input-textarea" id="messageInput" placeholder="Send a message..." rows="1"></textarea>
                         <div class="input-footer">
-                            <div class="input-left-actions">...</div>
+                            <div class="input-left-actions">
+                                <button class="attach-btn" id="attachBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt,.md,.json,.csv,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.rb,.go,.rs,.doc,.docx"></button>
+                                <div class="input-stats">
+                                    <div class="input-stat" id="tokenUsageStat" title="Estimated while typing; exact after provider usage returns"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg><span>In <span class="input-stat-value" id="inputTokens">0</span> / Out <span class="input-stat-value" id="outputTokens">0</span></span></div>
+                                    <div class="input-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg><span><span class="input-stat-value" id="contextUsed">0</span>/<span id="contextMax">0</span></span></div>
+                                </div>
+                            </div>
                             <div class="input-actions">
                                 <button class="stop-btn" id="stopBtn"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
                                 <button class="send-button" id="sendBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
@@ -125,9 +266,54 @@
         </main>
     </div>
 
-    <!-- Modals -->
-    <div class="modal-overlay" id="renameModal">...</div>
-    <div class="modal-overlay" id="shortcutsModal">...</div>
+    <div class="modal-overlay" id="renameModal">
+        <div class="modal">
+            <h3 class="modal-title">Rename Chat</h3>
+            <input type="text" class="modal-input" id="renameInput" placeholder="Enter chat name...">
+            <div class="modal-actions">
+                <button class="btn" id="renameCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="renameConfirmBtn">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="shortcutsModal">
+        <div class="modal shortcuts-modal">
+            <h3 class="modal-title">Keyboard Shortcuts</h3>
+            <div class="shortcuts-list">
+                <div class="shortcut-group">
+                    <div class="shortcut-group-title">General</div>
+                    <div class="shortcut-item"><span class="shortcut-desc">New ritual</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>O</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Toggle sidebar</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>B</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Focus input</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>/</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Show shortcuts</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>?</kbd></span></div>
+                </div>
+                <div class="shortcut-group">
+                    <div class="shortcut-group-title">Messages</div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Send message</span><span class="shortcut-keys"><kbd>Enter</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">New line</span><span class="shortcut-keys"><kbd>Shift</kbd><kbd>Enter</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Paste image</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>V</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Stop generation</span><span class="shortcut-keys"><kbd>Escape</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Latest user prompt</span><span class="shortcut-keys"><kbd>Alt</kbd><kbd>U</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Latest assistant response</span><span class="shortcut-keys"><kbd>Alt</kbd><kbd>A</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Current stream</span><span class="shortcut-keys"><kbd>Alt</kbd><kbd>S</kbd></span></div>
+                </div>
+                <div class="shortcut-group">
+                    <div class="shortcut-group-title">Context</div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Toggle pinned context</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>P</kbd></span></div>
+                </div>
+                <div class="shortcut-group">
+                    <div class="shortcut-group-title">Export</div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Export as Markdown</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">Export as JSON</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>J</kbd></span></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="closeShortcutsModal()">Got it</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="scripts/state.js" defer></script>
@@ -139,8 +325,6 @@
     <script src="scripts/stream.js" defer></script>
     <script src="scripts/shortcuts.js" defer></script>
     <script src="scripts/export.js" defer></script>
-    <script src="scripts/local-models.js" defer></script>
-    <script src="scripts/smart-router.js" defer></script>
     <script src="scripts/app.js" defer></script>
 </body>
 </html>
