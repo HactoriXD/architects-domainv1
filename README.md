@@ -1,3 +1,7 @@
+## Preview
+
+![Architect's Domain UI](assets/main-ui.png)
+
 # Architect's Domain
 
 Architect's Domain is a local first multi-model AI workstation built for power users, prompt engineers, roleplay creators, and AI explorers.
