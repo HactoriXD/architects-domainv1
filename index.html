@@ -108,6 +108,17 @@
                                 <button class="btn" id="clearLocalKeysBtn" type="button">Clear Local Keys</button>
                             </div>
                         </div>
+                        <!-- NEW: Smart Router Toggle -->
+                        <div class="settings-group">
+                            <div class="settings-label">
+                                <span>Smart Router</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="smartRouterToggle" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            <div class="settings-hint">Automatically recommends the best model for your prompt and estimates cost.</div>
+                        </div>
                         <div class="settings-group">
                             <div class="settings-label"><span>Settings Backup</span></div>
                             <div class="provider-actions">
@@ -325,6 +336,7 @@
     <script src="scripts/stream.js" defer></script>
     <script src="scripts/shortcuts.js" defer></script>
     <script src="scripts/export.js" defer></script>
+    <script src="scripts/smart-router.js" defer></script>
     <script src="scripts/app.js" defer></script>
 </body>
 </html>
