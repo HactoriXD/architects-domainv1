@@ -1,127 +1,181 @@
-## Preview
+## Architect's Domain
 
-![Architect's Domain UI](assets/main-ui.png)
+**Local-first • Multi-model • BYOAK AI Workstation for Power Users**
 
-# Architect's Domain
+![Architect's Domain](assets/main-ui.png)
 
-Architect's Domain is a local first multi-model AI workstation built for power users, prompt engineers, roleplay creators, and AI explorers.
+> A privacy-first, hackable AI cockpit that lets you switch between frontier models instantly, maintain persistent memory across chats, and experiment freely — all while keeping your API keys and data under your control.
 
-The project started as a single experimental HTML file and evolved into a modular AI cockpit with persistent memory, streaming chat, provider switching, markdown rendering, and BYOAK architecture.
+**Status:** Public Beta • Actively evolving
 
-## Features
+---
 
-* Multi-provider support
+## ✨ Why Architect's Domain?
 
-  * OpenRouter
-  * Venice.ai
-  * DeepSeek
+Most AI chat tools force you into one ecosystem. Architect's Domain is different:
 
-* BYOAK architecture
+- **True local-first** — runs anywhere (GitHub Pages, Netlify, localhost, even offline with local models)
+- **BYOAK (Bring Your Own API Keys)** — zero backend, zero secrets in the repo
+- **Multi-provider freedom** — OpenRouter, Venice.ai, DeepSeek, and soon Ollama / LM Studio
+- **Persistent contextual memory** — pin important context that follows you across every model and conversation
+- **Built for power users** — prompt engineers, roleplay creators, researchers, and tinkerers
 
-  * Users bring their own API keys
-  * No backend secrets required
-  * Keys stay inside browser localStorage
+No accounts. No tracking. No vendor lock-in.
 
-* Persistent pinned memory
+---
 
-  * Per-chat contextual memory
-  * Injected silently into requests
-  * Works across providers and models
+## 🚀 Quick Start
 
-* Streaming chat system
+### Option 1: Try it instantly (Recommended for first time)
+1. Visit the live demo (GitHub Pages link coming soon)
+2. Add your API keys in Settings
+3. Start chatting with pinned memory enabled
 
-  * Buffered SSE streaming
-  * Stable stream ownership
-  * Safe chat switching during generation
-  * Preserved partial outputs on stop
+### Option 2: Run locally
+```bash
+git clone https://github.com/HactoriXD/architects-domain.git
+cd architects-domain
+# Simple local server
+python -m http.server 8000
+# or use the included server.js
+node server.js
+```
+Then open http://localhost:8000
 
-* Advanced markdown rendering
+### Option 3: Deploy anywhere static
+- GitHub Pages
+- Netlify (drag & drop)
+- Cloudflare Pages
+- Vercel
 
-  * Fenced code blocks
-  * Syntax highlighting
-  * Inline formatting
-  * Better whitespace preservation
+---
 
-* Daily cockpit UX
+## ✨ Core Features
 
-  * Conversation navigation shortcuts
-  * Pinned context controls
-  * Export/import support
-  * Multi-chat workflow
+### Multi-Provider Support
+- OpenRouter
+- Venice.ai
+- DeepSeek
+- *Coming soon:* Ollama, LM Studio, Groq, Anthropic (via compatible endpoints)
 
-* Local-first architecture
+### BYOAK Architecture
+- API keys stored only in your browser (localStorage)
+- Keys never leave your device except to the provider you choose
+- Easy key management UI with validation
 
-  * Static host compatible
-  * No required database
-  * No required authentication
-  * Portable and hackable
+### Intelligent Memory System
+- Per-chat **pinned memory** that is silently injected into every request
+- Works across all providers and models
+- Future: semantic search, memory decay, branching conversations
 
-## Philosophy
+### Streaming & UX
+- Smooth buffered SSE streaming
+- Safe chat switching mid-generation
+- Preserved partial outputs when stopping
+- Advanced markdown with syntax highlighting and code blocks
 
-Architect's Domain is designed as an AI workstation instead of a minimal chatbot.
+### Cockpit Workflow
+- Multi-chat navigation
+- Keyboard shortcuts everywhere
+- Export / import conversations
+- Pinned context controls
 
-The goal is to create a flexible environment where users can:
+### Local-First Philosophy
+- Fully static — no database, no auth server required
+- Portable single-folder app
+- Hackable and forkable
 
-* switch between providers instantly
-* preserve context and memory
-* experiment with prompts
-* build characters and systems
-* use frontier models without platform lock-in
+---
 
-## Tech Stack
+## 🗺️ Roadmap
 
-Frontend:
+### v0.2 — Polish & Power Tools (Next 2–4 weeks)
+- [ ] Overhauled settings & provider management UI
+- [ ] Per-chat model overrides + smart router
+- [ ] Conversation branching & tree view
+- [ ] SillyTavern character card import/export
+- [ ] Keyboard shortcut overlay + full documentation
+- [ ] Better onboarding & first-run experience
+- [ ] Desktop wrapper (Tauri)
 
-* HTML
-* CSS
-* Vanilla JavaScript
+### v0.3 — Intelligence Layer (1–2 months)
+- [ ] Context window awareness + auto-summarization
+- [ ] Local model support (Ollama / LM Studio native)
+- [ ] Prompt template library + A/B testing mode
+- [ ] Semantic memory search (browser embeddings)
+- [ ] Image upload + vision model routing
 
-Architecture:
+### v1.0 — Production Ready (Q3 2026)
+- [ ] Theming system + focus modes
+- [ ] Full PWA + offline support
+- [ ] Comprehensive documentation & video tutorials
+- [ ] Plugin/extension system
+- [ ] Public release + community features
 
-* Modular file structure
-* Static-host compatible
-* BYOAK provider flow
+**Want to influence the roadmap?** Open an issue or join the discussion!
 
-Providers:
+---
 
-* OpenRouter
-* Venice.ai
-* DeepSeek
+## 🛠️ Development
 
-## Project Structure
+### Tech Stack
+- **Frontend**: Vanilla HTML + CSS + JavaScript (deliberately lightweight)
+- **Architecture**: Modular (`/styles`, `/scripts`, core files)
+- **No heavy frameworks** — maximum portability and hackability
 
-```text
-/styles
-/scripts
-index.html
-server.js
-package.json
+### Project Structure
+```
+architects-domain/
+├── index.html          # Main application
+├── server.js           # Optional local dev server
+├── package.json
+├── styles/             # CSS modules
+├── scripts/            # JS modules (providers, memory, ui, etc.)
+├── assets/             # Images, icons
+├── .env.example
+└── README.md
 ```
 
-## Hosting
+### Local Development
+```bash
+# Clone and run
+node server.js
+# or any static server
+```
 
-Architect's Domain can be hosted on:
+### Contributing
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon).
 
-* GitHub Pages
-* Netlify
-* Cloudflare Pages
-* Vercel static hosting
-* Any static web server
+Good first issues will be labeled `good first issue`.
 
-## Security Model
+---
 
-This project uses a strict BYOAK model.
+## 🔒 Security & Privacy
 
-Users provide their own API keys locally. Keys are stored in browser localStorage and sent directly to the selected provider.
+- **Strict BYOAK** — your keys never touch our servers (there are none)
+- Keys live only in browser localStorage
+- All communication goes directly from your browser to the AI provider
+- No analytics, no telemetry, no accounts
+- Open source — audit everything
 
-The repository does not contain provider secrets.
+**Note:** LocalStorage is convenient but not encrypted. For maximum security, consider clearing keys after use or using a password manager extension.
 
-## Status
+---
 
-Public beta.
+## 📜 License
 
-The project is actively evolving and focused on experimentation, usability, and AI workflow design.
+MIT License — see [LICENSE](LICENSE) file.
 
-## License
+---
 
-No license yet.
+## ❤️ Acknowledgments
+
+Inspired by the best ideas from SillyTavern, Oobabooga, and the broader local AI community.
+
+Special thanks to everyone building open, user-controlled AI tools.
+
+---
+
+**Built with ❤️ for power users who refuse to be locked in.**
+
+*Last updated: May 2026*
