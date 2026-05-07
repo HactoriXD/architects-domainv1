@@ -1,0 +1,63 @@
+/* Code Block with Header */
+        .code-block { 
+            position: relative; 
+            margin: 12px 0; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            background: #0f0f10; 
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .code-block-header { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 8px 12px; 
+            background: rgba(124,58,237,0.14);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            border-left: none;
+        }
+        .code-block-lang { font-family: 'Geist Mono', monospace; font-size: 0.75rem; color: rgba(255,255,255,0.72); text-transform: lowercase; }
+        .code-copy-btn { 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            padding: 4px 8px; 
+            background: rgba(255,255,255,0.06); 
+            border: 1px solid rgba(255,255,255,0.08); 
+            border-radius: 8px; 
+            color: rgba(255,255,255,0.75); 
+            font-family: var(--font-mono); 
+            font-size: 0.6875rem; 
+            cursor: pointer; 
+            transition: all var(--transition-fast); 
+        }
+        .code-copy-btn:hover { 
+            background: rgba(255,255,255,0.12); 
+            border-color: rgba(255,255,255,0.16); 
+            color: #fff;
+        }
+        .code-copy-btn:active {
+            transform: scale(0.98);
+        }
+        .code-copy-btn.copied { 
+            background: rgba(16, 185, 129, 0.1); 
+            border-color: var(--success); 
+            color: var(--success); 
+        }
+        .code-copy-btn svg { width: 12px; height: 12px; }
+        .code-block pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; white-space: pre; tab-size: 4; }
+        .code-block pre code { background: none; padding: 0; color: var(--text-primary); white-space: pre; font-size: inherit; }
+
+        /* Syntax Highlighting */
+        .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: #c792ea; }
+        .hljs-string, .hljs-attr { color: #c3e88d; }
+        .hljs-number, .hljs-literal { color: #f78c6c; }
+        .hljs-comment { color: #546e7a; font-style: italic; }
+        .hljs-function, .hljs-title { color: #82aaff; }
+        .hljs-variable, .hljs-template-variable { color: #f07178; }
+        .hljs-type, .hljs-class { color: #ffcb6b; }
+        .hljs-property { color: #89ddff; }
+        .hljs-regexp { color: #89ddff; }
+        .hljs-symbol { color: #82aaff; }
+        .hljs-meta { color: #89ddff; }
+        .hljs-punctuation { color: #89ddff; }
