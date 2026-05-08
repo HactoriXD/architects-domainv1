@@ -141,6 +141,15 @@ const PROVIDERS = {
             selectedModelId: model.id,
             settings: { ...state.settings }
         };
+        const workspace = getActiveWorkspace();
+        if (workspace) {
+            workspace.providerPreset = {
+                provider: state.provider,
+                selectedModelId: model.id,
+                settings: { ...state.settings }
+            };
+            touchWorkspace(workspace.id);
+        }
         el.selectedProviderName.textContent = getProvider().label;
         updateSelectedModelCostDisplay();
         el.visionBadge.style.display = isVisionModel(model.id) ? 'inline-block' : 'none';
@@ -261,6 +270,15 @@ const PROVIDERS = {
             settings: { ...state.settings },
             thinkingByModel: { ...(state.providerSettings[state.provider]?.thinkingByModel || {}) }
         };
+        const workspace = getActiveWorkspace();
+        if (workspace) {
+            workspace.providerPreset = {
+                provider: state.provider,
+                selectedModelId: state.selectedModel?.id || state.providerSettings[state.provider]?.selectedModelId || null,
+                settings: { ...state.settings }
+            };
+            touchWorkspace(workspace.id);
+        }
     }
 
     function restoreProviderSettings(providerId) {
@@ -399,7 +417,7 @@ const PROVIDERS = {
         }
     }
 
-function buildPinnedContextMessage(notes) {
+    function buildPinnedContextMessage(notes) {
         const trimmed = String(notes || '').trim();
         if (!trimmed) return null;
         return {
@@ -408,11 +426,20 @@ function buildPinnedContextMessage(notes) {
         };
     }
 
+    function buildWorkspaceNotesMessage(workspace = getActiveWorkspace()) {
+        const notes = String(workspace?.workspaceNotes || '').trim();
+        if (!notes) return null;
+        return {
+            role: 'system',
+            content: `Workspace notes. Use these as durable project context for this workspace.\n\n${notes}`
+        };
+    }
+
     const MEMORY_CATEGORY_ORDER = ['identity', 'preference', 'relationship', 'project', 'goal'];
 
     function getEnabledMemoriesForContext() {
         return [...state.memories]
-            .filter(memory => memory.enabled && memory.content)
+            .filter(memory => memory.enabled && memory.content && memory.workspaceId === state.activeWorkspaceId)
             .sort((a, b) => {
                 if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
                 const aCategory = MEMORY_CATEGORY_ORDER.indexOf(a.category);
@@ -430,6 +457,57 @@ function buildPinnedContextMessage(notes) {
         return {
             role: 'system',
             content: `Persistent user-approved memory. Use these notes as durable context, but do not mention them unless directly relevant.\n\n${lines.join('\n')}`
+        };
+    }
+
+    function getEnabledLorebooksForContext(workspace = getActiveWorkspace()) {
+        return [...(workspace?.lorebooks || [])]
+            .filter(entry => entry.enabled && entry.content)
+            .sort((a, b) => {
+                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                if ((a.updatedAt || 0) !== (b.updatedAt || 0)) return (a.updatedAt || 0) - (b.updatedAt || 0);
+                return String(a.id).localeCompare(String(b.id));
+            });
+    }
+
+    function buildLorebookContextMessage(entries = getEnabledLorebooksForContext()) {
+        if (!entries.length) return null;
+        const lines = entries.map(entry => `## ${entry.title}${entry.pinned ? ' (pinned)' : ''}\n${entry.content}`);
+        return {
+            role: 'system',
+            content: `Workspace lorebook entries. Treat these as user-approved durable canon or project facts.\n\n${lines.join('\n\n')}`
+        };
+    }
+
+    function getEnabledImportedFilesForContext(workspace = getActiveWorkspace()) {
+        return [...(workspace?.importedFiles || [])]
+            .filter(file => file.enabled && file.content)
+            .sort((a, b) => {
+                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                if ((a.updatedAt || 0) !== (b.updatedAt || 0)) return (a.updatedAt || 0) - (b.updatedAt || 0);
+                return String(a.id).localeCompare(String(b.id));
+            });
+    }
+
+    function buildImportedFilesContextMessage(files = getEnabledImportedFilesForContext()) {
+        if (!files.length) return null;
+        const sections = files.map(file => `## ${file.name}${file.pinned ? ' (pinned)' : ''}\n${file.content.slice(0, WORKSPACE_FILE_LIMIT)}`);
+        return {
+            role: 'system',
+            content: `Workspace imported files. Use these local files only when relevant.\n\n${sections.join('\n\n')}`
+        };
+    }
+
+    function buildMcpCapabilityContextMessage() {
+        const servers = getWorkspaceMcpServers().filter(server => server.enabled);
+        if (!servers.length) return null;
+        const lines = servers.map(server => {
+            const tools = (server.capabilities || []).filter(capability => capability.kind === 'tool').map(tool => tool.name);
+            return `- ${server.name}: ${server.status}${tools.length ? `; tools: ${tools.join(', ')}` : ''}`;
+        });
+        return {
+            role: 'system',
+            content: `Available MCP capability state. These tools are not automatically invoked; the user must explicitly request tool use.\n\n${lines.join('\n')}`
         };
     }
 
@@ -456,10 +534,18 @@ function buildPinnedContextMessage(notes) {
         const systemPrompt = String(options.systemPrompt ?? state.savedSystemPrompt ?? '').trim();
         const pinnedNotes = String(options.pinnedNotes ?? state.pinnedNotes ?? '').trim();
         if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
+        const workspaceNotesMessage = buildWorkspaceNotesMessage();
+        if (workspaceNotesMessage) apiMessages.push(workspaceNotesMessage);
         const pinnedMessage = buildPinnedContextMessage(pinnedNotes);
-        if (pinnedMessage) apiMessages.push(pinnedMessage);
         const memoryMessage = buildMemoryContextMessage();
         if (memoryMessage) apiMessages.push(memoryMessage);
+        const lorebookMessage = buildLorebookContextMessage();
+        if (lorebookMessage) apiMessages.push(lorebookMessage);
+        const importedFilesMessage = buildImportedFilesContextMessage();
+        if (importedFilesMessage) apiMessages.push(importedFilesMessage);
+        const mcpMessage = buildMcpCapabilityContextMessage();
+        if (mcpMessage) apiMessages.push(mcpMessage);
+        if (pinnedMessage) apiMessages.push(pinnedMessage);
         for (const msg of messages) apiMessages.push(messageToApiMessage(msg));
         return apiMessages;
     }

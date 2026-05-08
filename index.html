@@ -30,13 +30,25 @@
                 <span class="logo-text">Architect's Domain</span>
                 <button class="sidebar-close" id="sidebarClose" title="Close sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
-            <button class="new-chat-btn" id="newChatBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Ritual</button>
+            <div class="workspace-switcher">
+                <button class="workspace-switcher-btn" id="workspaceSwitcherBtn" type="button">
+                    <span class="workspace-avatar" id="workspaceAvatar">AD</span>
+                    <span class="workspace-meta">
+                        <span class="workspace-name" id="workspaceName">Architect's Domain</span>
+                        <span class="workspace-kind" id="workspaceKind">Workspace</span>
+                    </span>
+                    <svg class="workspace-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="workspace-switcher-menu" id="workspaceSwitcherMenu"></div>
+            </div>
+            <button class="new-chat-btn" id="newChatBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Chat</button>
+            <button class="workspace-manage-btn" id="workspaceManageBtn" type="button">Manage Workspaces</button>
         </div>
         <div class="sidebar-search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" placeholder="Search chats..." id="chatSearch">
         </div>
-        <div class="chat-list" id="chatList"><div class="no-chats">No rituals yet</div></div>
+        <div class="chat-list" id="chatList"><div class="no-chats">No chats yet</div></div>
     </aside>
 
     <div class="main-wrapper">
@@ -202,7 +214,6 @@
                     <svg class="system-prompt-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
                 <div class="system-prompt-body">
-                    <p class="system-prompt-description">Define the rules of this domain before the first invocation.</p>
                     <div class="system-prompt-presets" id="systemPromptPresets">
                         <button class="system-prompt-preset" data-preset="roleplay" type="button">Roleplay</button>
                         <button class="system-prompt-preset" data-preset="coding" type="button">Coding</button>
@@ -210,7 +221,7 @@
                         <button class="system-prompt-preset" data-preset="journal" type="button">Journal</button>
                         <button class="system-prompt-preset" data-preset="lorekeeper" type="button">Lorekeeper</button>
                     </div>
-                    <textarea class="system-prompt-textarea" id="systemPrompt" placeholder="Write the law of the room..."></textarea>
+                    <textarea class="system-prompt-textarea" id="systemPrompt" placeholder="Set behavior, tone, boundaries, and context for this workspace..."></textarea>
                     <div class="system-prompt-footer">
                         <div class="system-prompt-stats"><span id="systemPromptWordCount">0</span> words &middot; <span id="systemPromptCharCount">0</span> chars</div>
                         <div style="display:flex;align-items:center;gap:12px">
@@ -264,21 +275,21 @@
                     <h2 class="empty-state-title">Welcome to Architect's Domain</h2>
                     <p class="empty-state-subtitle">Select a model and send a message to begin. You can attach images and files.</p>
                     <div class="quick-start-grid">
-                        <button class="quick-start-card" data-prompt="Begin a focused creative session. Ask me three questions, then help me turn the answers into a concrete plan.">
-                            <span class="quick-start-title">Start a Ritual</span>
-                            <span class="quick-start-desc">Open with questions, structure, and momentum.</span>
+                        <button class="quick-start-card" data-prompt="Start a focused chat. Ask me three useful questions, then help me turn the answers into a concrete next step.">
+                            <span class="quick-start-title">Start a chat</span>
+                            <span class="quick-start-desc">Open with clarity, structure, and momentum.</span>
                         </button>
-                        <button class="quick-start-card" data-prompt="Help me create a vivid character. Build their voice, wounds, desires, boundaries, contradictions, and first scene.">
+                        <button class="quick-start-card" data-prompt="Help me create a vivid character. Build their voice, desires, contradictions, boundaries, and first scene.">
                             <span class="quick-start-title">Create a Character</span>
-                            <span class="quick-start-desc">Shape voice, motive, conflict, and scene hooks.</span>
+                            <span class="quick-start-desc">Shape voice, motive, conflict, and presence.</span>
                         </button>
                         <button class="quick-start-card" data-prompt="I will attach a file. Analyze it for structure, risks, missing pieces, and the most useful next actions.">
                             <span class="quick-start-title">Analyze a File</span>
-                            <span class="quick-start-desc">Inspect documents, code, notes, or exports.</span>
+                            <span class="quick-start-desc">Review documents, code, notes, or exports.</span>
                         </button>
-                        <button class="quick-start-card" data-prompt="Brainstorm a domain for a project: name, aesthetic, core features, user rituals, and what makes it memorable.">
-                            <span class="quick-start-title">Brainstorm a Domain</span>
-                            <span class="quick-start-desc">Generate identity, product shape, and direction.</span>
+                        <button class="quick-start-card" data-prompt="Brainstorm ideas for a project: name, audience, aesthetic, core features, workflows, and what makes it memorable.">
+                            <span class="quick-start-title">Brainstorm ideas</span>
+                            <span class="quick-start-desc">Explore identity, product shape, and direction.</span>
                         </button>
                     </div>
                 </div>
@@ -333,7 +344,7 @@
             <div class="shortcuts-list">
                 <div class="shortcut-group">
                     <div class="shortcut-group-title">General</div>
-                    <div class="shortcut-item"><span class="shortcut-desc">New ritual</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>O</kbd></span></div>
+                    <div class="shortcut-item"><span class="shortcut-desc">New chat</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>O</kbd></span></div>
                     <div class="shortcut-item"><span class="shortcut-desc">Toggle sidebar</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>B</kbd></span></div>
                     <div class="shortcut-item"><span class="shortcut-desc">Focus input</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>/</kbd></span></div>
                     <div class="shortcut-item"><span class="shortcut-desc">Show shortcuts</span><span class="shortcut-keys"><kbd>Ctrl</kbd><kbd>?</kbd></span></div>
@@ -409,10 +420,65 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="workspaceModal">
+        <div class="modal workspace-modal">
+            <div class="workspace-modal-header">
+                <div>
+                    <h3 class="modal-title">Workspace Manager</h3>
+                    <p class="workspace-modal-subtitle">Projects, memories, MCP servers, and imported context live here.</p>
+                </div>
+                <button class="workspace-close-btn" id="workspaceCloseBtn" type="button" aria-label="Close Workspace Manager">&times;</button>
+            </div>
+            <div class="workspace-manager-grid">
+                <section class="workspace-manager-panel">
+                    <div class="workspace-manager-toolbar">
+                        <button class="btn btn-primary" id="workspaceCreateBtn" type="button">New Workspace</button>
+                        <label class="workspace-toggle"><input type="checkbox" id="workspaceShowArchived"> Show archived</label>
+                    </div>
+                    <div class="workspace-list" id="workspaceList"></div>
+                </section>
+                <section class="workspace-manager-panel active-workspace-editor">
+                    <div class="workspace-form-grid">
+                        <label class="workspace-field"><span>Name</span><input class="modal-input" id="workspaceNameInput" maxlength="80"></label>
+                        <label class="workspace-field"><span>Kind</span><select class="settings-select" id="workspaceKindInput"><option value="workspace">Workspace</option><option value="project">Project</option><option value="domain">Domain</option></select></label>
+                        <label class="workspace-field"><span>Icon</span><input class="modal-input" id="workspaceIconInput" maxlength="4"></label>
+                        <label class="workspace-field"><span>Accent</span><input class="modal-input workspace-color-input" id="workspaceColorInput" type="color" value="#8b5cf6"></label>
+                    </div>
+                    <label class="workspace-field workspace-notes-field"><span>Workspace Notes</span><textarea class="modal-input workspace-notes-input" id="workspaceNotesInput" placeholder="Durable notes for this workspace..."></textarea></label>
+                    <div class="workspace-context-grid">
+                        <div class="workspace-context-card">
+                            <div class="workspace-context-header">
+                                <strong>Lorebooks</strong>
+                                <button class="btn" id="lorebookAddBtn" type="button">Add Entry</button>
+                            </div>
+                            <div class="workspace-stack" id="lorebookList"></div>
+                        </div>
+                        <div class="workspace-context-card">
+                            <div class="workspace-context-header">
+                                <strong>Imported Files</strong>
+                                <button class="btn" id="importedFileAddBtn" type="button">Import File</button>
+                                <input type="file" id="importedFileInput" multiple accept=".txt,.md,.json,.js,.ts,.css,.html,.py,.csv" hidden>
+                            </div>
+                            <div class="workspace-stack" id="importedFileList"></div>
+                        </div>
+                    </div>
+                    <div class="workspace-import-export">
+                        <button class="btn" id="workspaceExportBtn" type="button">Export Workspace</button>
+                        <button class="btn" id="workspaceImportBtn" type="button">Import Workspace</button>
+                        <input type="file" id="workspaceImportInput" accept="application/json,.json" hidden>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="scripts/state.js" defer></script>
     <script src="scripts/storage.js" defer></script>
+    <script src="scripts/workspaces/store.js" defer></script>
+    <script src="scripts/workspaces/router.js" defer></script>
+    <script src="scripts/workspaces/ui.js" defer></script>
     <script src="scripts/mcp/registry.js" defer></script>
     <script src="scripts/mcp/client.js" defer></script>
     <script src="scripts/mcp/manager.js" defer></script>

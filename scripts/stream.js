@@ -86,9 +86,9 @@ function finalizeStreamingMessage(content, usage = null, stream = state.activeSt
             chat.lastUsage = usage || chat.lastUsage || null;
         }
         chat.updatedAt = Date.now();
-        if (!chat.title || chat.title === 'New Ritual') {
+        if (!chat.title || chat.title === 'New Ritual' || chat.title === 'New Chat') {
             const title = generateChatTitleFromMessages(chat.messages);
-            if (title && title !== 'New Ritual') chat.title = title;
+            if (title && title !== 'New Ritual' && title !== 'New Chat') chat.title = title;
         }
         saveChats();
         renderChatList();

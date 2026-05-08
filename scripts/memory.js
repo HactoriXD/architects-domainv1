@@ -29,8 +29,8 @@
 
     function memoryExists(content) {
         const normalized = String(content || '').trim().toLowerCase();
-        return state.memories.some(memory => memory.content.trim().toLowerCase() === normalized)
-            || state.memorySuggestions.some(suggestion => suggestion.content.trim().toLowerCase() === normalized);
+        return state.memories.some(memory => memory.content.trim().toLowerCase() === normalized && memory.workspaceId === state.activeWorkspaceId)
+            || state.memorySuggestions.some(suggestion => suggestion.content.trim().toLowerCase() === normalized && suggestion.workspaceId === state.activeWorkspaceId);
     }
 
     function extractMemorySuggestionsFromText(text, sourceMessage) {
@@ -64,6 +64,7 @@
                 confidence: Math.max(rule.confidence, evaluation.score),
                 sourceChat: state.currentChatId,
                 sourceMessage,
+                workspaceId: state.activeWorkspaceId,
                 createdAt: Date.now()
             });
         }
@@ -182,9 +183,11 @@
             updatedAt: now,
             sourceChat: suggestion.sourceChat,
             sourceMessage: suggestion.sourceMessage,
+            workspaceId: suggestion.workspaceId || state.activeWorkspaceId,
             pinned: false,
             enabled: true
         });
+        syncWorkspaceForMemory(state.memories[state.memories.length - 1]);
         state.memorySuggestions = state.memorySuggestions.filter(item => item.id !== id);
         saveMemories();
         renderMemorySuggestions();
@@ -200,8 +203,9 @@
 
     function renderMemorySuggestions() {
         if (!el.memorySuggestions || !el.memorySuggestionsList) return;
-        el.memorySuggestions.hidden = state.memorySuggestions.length === 0;
-        el.memorySuggestionsList.innerHTML = state.memorySuggestions.map(suggestion => `
+        const suggestions = state.memorySuggestions.filter(suggestion => !suggestion.workspaceId || suggestion.workspaceId === state.activeWorkspaceId);
+        el.memorySuggestions.hidden = suggestions.length === 0;
+        el.memorySuggestionsList.innerHTML = suggestions.map(suggestion => `
             <div class="memory-suggestion-card" data-memory-suggestion="${suggestion.id}">
                 <div class="memory-card-meta">
                     <span class="memory-category">${MEMORY_CATEGORIES[suggestion.category] || 'Memory'}</span>
@@ -221,6 +225,7 @@
         const query = (state.memorySearch || '').toLowerCase();
         const category = state.memoryFilter || 'all';
         const memories = getEnabledAndDisabledMemories().filter(memory => {
+            if (memory.workspaceId !== state.activeWorkspaceId) return false;
             const matchesCategory = category === 'all' || memory.category === category;
             const matchesQuery = !query || memory.content.toLowerCase().includes(query);
             return matchesCategory && matchesQuery;
@@ -245,7 +250,7 @@
     }
 
     function getEnabledAndDisabledMemories() {
-        return [...state.memories].sort((a, b) => {
+        return getWorkspaceMemories().sort((a, b) => {
             if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
             if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
             return (b.updatedAt || 0) - (a.updatedAt || 0);
@@ -265,7 +270,10 @@
             const content = item.querySelector('.memory-edit')?.value.trim();
             if (content) memory.content = content;
         }
-        if (action === 'delete') state.memories = state.memories.filter(entry => entry.id !== memory.id);
+        if (action === 'delete') {
+            removeWorkspaceRelation(memory.workspaceId, 'memoryIds', memory.id);
+            state.memories = state.memories.filter(entry => entry.id !== memory.id);
+        }
         memory.updatedAt = Date.now();
         saveMemories();
         renderMemoryManager();
@@ -280,14 +288,22 @@
     function updateContextInspector() {
         if (!el.contextSourcesList) return;
         const sources = [];
-        const systemPrompt = String(state.savedSystemPrompt || '').trim();
+        const workspace = getActiveWorkspace();
+        const systemPrompt = String(state.savedSystemPrompt || workspace?.systemPrompt || '').trim();
+        const workspaceNotes = String(workspace?.workspaceNotes || '').trim();
         const pinnedNotes = String(state.pinnedNotes || '').trim();
         if (systemPrompt) sources.push({ type: 'System', label: 'System prompt', detail: `${systemPrompt.length} chars`, active: true });
-        if (pinnedNotes) sources.push({ type: 'Pinned', label: 'Pinned notes', detail: `${pinnedNotes.length} chars`, active: true });
+        if (workspaceNotes) sources.push({ type: 'Workspace', label: 'Workspace notes', detail: `${workspaceNotes.length} chars`, active: true });
         for (const memory of getEnabledMemoriesForContext()) {
             sources.push({ type: 'Memory', label: memory.content, detail: MEMORY_CATEGORIES[memory.category] || 'Memory', active: true });
         }
-        for (const server of state.mcpServers.filter(server => server.enabled)) {
+        for (const entry of getEnabledLorebooksForContext()) {
+            sources.push({ type: 'Lore', label: entry.title, detail: entry.pinned ? 'Pinned lorebook' : 'Lorebook', active: true });
+        }
+        for (const file of getEnabledImportedFilesForContext()) {
+            sources.push({ type: 'File', label: file.name, detail: formatFileSize(file.size), active: true });
+        }
+        for (const server of getWorkspaceMcpServers().filter(server => server.enabled)) {
             const tools = (server.capabilities || []).filter(capability => capability.kind === 'tool');
             sources.push({
                 type: 'MCP',
@@ -296,6 +312,7 @@
                 active: server.status === 'connected'
             });
         }
+        if (pinnedNotes) sources.push({ type: 'Pinned', label: 'Pinned chat context', detail: `${pinnedNotes.length} chars`, active: true });
         el.contextSourcesSummary.textContent = `${sources.filter(source => source.active).length} active`;
         el.contextSourcesList.innerHTML = sources.length ? sources.map(source => `
             <div class="context-source ${source.active ? '' : 'inactive'}">

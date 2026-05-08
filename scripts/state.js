@@ -9,16 +9,18 @@
         STORAGE_KEY: 'architects_domain_chats',
         SETTINGS_KEY: 'architects_domain_settings',
         MEMORIES_KEY: 'architects_domain_memories',
-        MCP_SERVERS_KEY: 'architects_domain_mcp_servers'
+        MCP_SERVERS_KEY: 'architects_domain_mcp_servers',
+        WORKSPACES_KEY: 'architects_domain_workspaces',
+        ACTIVE_WORKSPACE_KEY: 'architects_domain_active_workspace'
     };
 
     const VISION_MODELS = ['anthropic/claude-sonnet-4','anthropic/claude-3.5-sonnet','anthropic/claude-3-opus','anthropic/claude-3-sonnet','anthropic/claude-3-haiku','openai/gpt-4o','openai/gpt-4o-mini','openai/gpt-4-turbo','google/gemini-pro-1.5','google/gemini-flash-1.5','meta-llama/llama-3.2-90b-vision-instruct','meta-llama/llama-3.2-11b-vision-instruct'];
     const SYSTEM_PROMPT_PRESETS = {
-        roleplay: 'You are a vivid roleplay partner. Maintain character consistency, sensory detail, emotional continuity, and scene momentum. Ask before changing major stakes or tone.',
-        coding: 'You are a senior engineering partner. Be precise, inspect assumptions, prefer existing patterns, explain tradeoffs briefly, and produce practical code with focused tests when useful.',
-        research: 'You are a rigorous research analyst. Separate facts from inference, cite uncertainty, compare sources when available, and end with the clearest next question or decision.',
-        journal: 'You are a reflective journaling companion. Be warm, grounded, and psychologically careful. Ask thoughtful questions, notice patterns, and never overclaim certainty.',
-        lorekeeper: 'You are a lorekeeper for an evolving fictional domain. Preserve canon, track names and contradictions, deepen symbols, and turn scattered ideas into coherent mythology.'
+        roleplay: 'You are an immersive roleplay partner. Maintain character voice, emotional continuity, scene geography, and established canon. Write with sensory detail and consequence. Preserve the user\'s agency, do not take control of their character, and ask before changing major stakes, tone, or boundaries.',
+        coding: 'You are a senior engineering partner working inside an existing codebase. Inspect before changing, prefer local patterns, keep edits scoped, and explain tradeoffs briefly. Prioritize correctness, maintainability, focused tests, and non-destructive git hygiene.',
+        research: 'You are a rigorous research analyst. Separate confirmed facts from inference, name uncertainty, compare evidence, and avoid overclaiming. Produce concise synthesis, source-aware reasoning, and a clear next decision or question.',
+        journal: 'You are a grounded reflective companion. Help clarify emotions, patterns, values, and next actions without diagnosing or overreaching. Be warm, specific, and practical; ask one useful question when more context matters.',
+        lorekeeper: 'You are the continuity keeper for an evolving fictional or project domain. Track canon, names, timelines, contradictions, tone, symbols, and unresolved threads. Preserve established facts, flag conflicts gently, and turn fragments into coherent world structure.'
     };
     const MODEL_PRICING_USD_PER_1M = {
         deepseek: {
@@ -74,6 +76,10 @@
         lightbox: { open: false, images: [], index: 0, zoom: 1, mode: 'fit' },
         mcpServers: [],
         mcpRegistry: [],
+        workspaces: {},
+        activeWorkspaceId: null,
+        workspaceManagerFilterArchived: false,
+        workspaceSearch: '',
         followStream: true,
         activeStream: null,
         providerStatus: {},
@@ -92,6 +98,30 @@
         chatList: document.getElementById('chatList'),
         chatSearch: document.getElementById('chatSearch'),
         newChatBtn: document.getElementById('newChatBtn'),
+        workspaceSwitcherBtn: document.getElementById('workspaceSwitcherBtn'),
+        workspaceSwitcherMenu: document.getElementById('workspaceSwitcherMenu'),
+        workspaceAvatar: document.getElementById('workspaceAvatar'),
+        workspaceName: document.getElementById('workspaceName'),
+        workspaceKind: document.getElementById('workspaceKind'),
+        workspaceManageBtn: document.getElementById('workspaceManageBtn'),
+        workspaceModal: document.getElementById('workspaceModal'),
+        workspaceCloseBtn: document.getElementById('workspaceCloseBtn'),
+        workspaceCreateBtn: document.getElementById('workspaceCreateBtn'),
+        workspaceShowArchived: document.getElementById('workspaceShowArchived'),
+        workspaceList: document.getElementById('workspaceList'),
+        workspaceNameInput: document.getElementById('workspaceNameInput'),
+        workspaceKindInput: document.getElementById('workspaceKindInput'),
+        workspaceIconInput: document.getElementById('workspaceIconInput'),
+        workspaceColorInput: document.getElementById('workspaceColorInput'),
+        workspaceNotesInput: document.getElementById('workspaceNotesInput'),
+        workspaceExportBtn: document.getElementById('workspaceExportBtn'),
+        workspaceImportBtn: document.getElementById('workspaceImportBtn'),
+        workspaceImportInput: document.getElementById('workspaceImportInput'),
+        lorebookList: document.getElementById('lorebookList'),
+        lorebookAddBtn: document.getElementById('lorebookAddBtn'),
+        importedFileList: document.getElementById('importedFileList'),
+        importedFileInput: document.getElementById('importedFileInput'),
+        importedFileAddBtn: document.getElementById('importedFileAddBtn'),
         modelSelectorBtn: document.getElementById('modelSelectorBtn'),
         modelDropdown: document.getElementById('modelDropdown'),
         modelSearch: document.getElementById('modelSearch'),
@@ -248,13 +278,13 @@
     const scheduleSaveSettings = debounce(() => saveSettings(), 180);
 
     function generateChatTitle(text) {
-        if (!text) return 'New Ritual';
+        if (!text) return 'New Chat';
         const generic = /^\s*(hi|hello|hey|yo|sup|heyy|heyyy|hai|hola|what's up|whats up|greetings|good morning|good evening|good afternoon|howdy|wassup|wsg|helo)\s*[!.]*\s*$/i;
         if (generic.test(text)) return null;
         const cleaned = text.replace(/^["']|["']$/g, '').replace(/[!?#]+/g, '').replace(/\s+/g, ' ').trim();
         const words = cleaned.split(/\s+/);
         const title = words.slice(0, 5).join(' ');
-        if (!title) return 'New Ritual';
+        if (!title) return 'New Chat';
         return title.charAt(0).toUpperCase() + title.slice(1);
     }
 
@@ -265,7 +295,7 @@
                 if (title) return title;
             }
         }
-        return 'New Ritual';
+        return 'New Chat';
     }
 
     function getModelTraits(model) {

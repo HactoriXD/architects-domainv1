@@ -52,9 +52,10 @@
                 confidence: Number(memory.confidence) || 0.6,
                 createdAt: memory.createdAt || Date.now(),
                 updatedAt: memory.updatedAt || memory.createdAt || Date.now(),
-                sourceChat: memory.sourceChat || null,
-                sourceMessage: memory.sourceMessage || null,
-                pinned: Boolean(memory.pinned),
+            sourceChat: memory.sourceChat || null,
+            sourceMessage: memory.sourceMessage || null,
+            workspaceId: memory.workspaceId || state.activeWorkspaceId || '',
+            pinned: Boolean(memory.pinned),
                 enabled: memory.enabled !== false
             };
         }).filter(memory => memory.content && memory.category);
@@ -85,6 +86,7 @@
             name: String(server.name || 'MCP Server').trim(),
             type: server.type || 'custom',
             endpoint: String(server.endpoint || '').trim(),
+            workspaceId: server.workspaceId || state.activeWorkspaceId || '',
             enabled: Boolean(server.enabled),
             status: server.status || 'untested',
             capabilities: Array.isArray(server.capabilities) ? server.capabilities : [],
@@ -97,6 +99,7 @@
     function normalizeLoadedChats() {
         for (const chat of Object.values(state.chats)) {
             if (!Array.isArray(chat.messages)) chat.messages = [];
+            if (typeof chat.workspaceId !== 'string') chat.workspaceId = state.activeWorkspaceId || '';
             if (typeof chat.systemPrompt !== 'string') chat.systemPrompt = '';
             if (typeof chat.pinnedNotes !== 'string') chat.pinnedNotes = '';
             if (!chat.createdAt) chat.createdAt = Date.now();
@@ -109,6 +112,7 @@
             provider: state.provider,
             apiKeys: state.apiKeys,
             selectedModelId: state.selectedModel?.id,
+            activeWorkspaceId: state.activeWorkspaceId,
             webSearchEnabled: state.webSearchEnabled,
             providerSettings: state.providerSettings,
             providerStatus: state.providerStatus,
@@ -124,6 +128,7 @@
                 const d = JSON.parse(saved);
                 if (d.provider && PROVIDERS[d.provider]) state.provider = d.provider;
                 if (d.apiKeys) state.apiKeys = d.apiKeys;
+                if (d.activeWorkspaceId) state.activeWorkspaceId = d.activeWorkspaceId;
                 if (typeof d.webSearchEnabled === 'boolean') state.webSearchEnabled = d.webSearchEnabled;
                 if (d.providerSettings) state.providerSettings = d.providerSettings;
                 if (d.providerStatus) state.providerStatus = d.providerStatus;

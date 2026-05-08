@@ -8,11 +8,12 @@
 
     function renderMcpServers() {
         if (!el.mcpServerList) return;
-        if (!state.mcpServers.length) {
+        const servers = getWorkspaceMcpServers();
+        if (!servers.length) {
             el.mcpServerList.innerHTML = '<div class="mcp-empty">No MCP servers configured.</div>';
             return;
         }
-        el.mcpServerList.innerHTML = state.mcpServers.map(server => {
+        el.mcpServerList.innerHTML = servers.map(server => {
             const preset = getMcpPreset(server.type);
             const tools = (server.capabilities || []).filter(capability => capability.kind === 'tool');
             const capabilityHtml = tools.length
@@ -46,7 +47,7 @@
         const id = button.closest('[data-mcp-id]')?.dataset.mcpId;
         if (!id) return;
         if (button.dataset.mcpAction === 'toggle') {
-            const server = state.mcpServers.find(item => item.id === id);
+            const server = getWorkspaceMcpServers().find(item => item.id === id);
             updateMcpServer(id, { enabled: !server.enabled });
         }
         if (button.dataset.mcpAction === 'test') testMcpServer(id);

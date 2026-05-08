@@ -158,6 +158,7 @@
             // Escape - stop generation or close modals
             if (e.key === 'Escape') {
                 if (state.lightbox?.open) { closeLightbox(); e.preventDefault(); }
+                else if (el.workspaceModal.classList.contains('open')) { closeWorkspaceManager(); e.preventDefault(); }
                 else if (el.memoryModal.classList.contains('open')) { el.memoryModal.classList.remove('open'); e.preventDefault(); }
                 else if (state.isStreaming) { stopGeneration(); e.preventDefault(); }
                 else if (el.shortcutsModal.classList.contains('open')) { closeShortcutsModal(); e.preventDefault(); }
@@ -168,7 +169,7 @@
             if (state.lightbox?.open && e.key === 'ArrowLeft') { e.preventDefault(); moveLightbox(-1); }
             if (state.lightbox?.open && e.key === 'ArrowRight') { e.preventDefault(); moveLightbox(1); }
             
-            // Ctrl+Shift+O - New ritual
+            // Ctrl+Shift+O - New chat
             if (ctrl && e.shiftKey && e.key === 'O') { e.preventDefault(); createNewChat(); }
 
             // Ctrl+Shift+P - Toggle pinned context

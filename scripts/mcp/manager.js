@@ -10,6 +10,7 @@
             endpoint: String(endpoint || '').trim(),
             enabled: false,
             status: 'untested',
+            workspaceId: state.activeWorkspaceId,
             capabilities: [],
             createdAt: now,
             updatedAt: now,
@@ -29,6 +30,7 @@
             return;
         }
         state.mcpServers.push(server);
+        syncWorkspaceForMcpServer(server);
         saveMcpServers();
         renderMcpServers();
         updateContextInspector();
@@ -37,7 +39,7 @@
     }
 
     function updateMcpServer(id, patch) {
-        const server = state.mcpServers.find(item => item.id === id);
+        const server = getWorkspaceMcpServers().find(item => item.id === id);
         if (!server) return null;
         Object.assign(server, patch, { updatedAt: Date.now() });
         saveMcpServers();
@@ -47,6 +49,8 @@
     }
 
     function removeMcpServer(id) {
+        const server = state.mcpServers.find(item => item.id === id);
+        removeWorkspaceRelation(server?.workspaceId, 'mcpServerIds', id);
         state.mcpServers = state.mcpServers.filter(server => server.id !== id);
         saveMcpServers();
         renderMcpServers();

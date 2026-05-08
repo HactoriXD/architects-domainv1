@@ -23,15 +23,18 @@
         initMcpRegistry();
         loadMcpServers();
         loadSettings();
+        loadWorkspaces();
         initEventListeners();
         initLightbox();
+        initWorkspacesUi();
         initMemory();
         initMcpUi();
+        applyWorkspaceState(getActiveWorkspace());
         await fetchModels();
         
-        const chatIds = Object.keys(state.chats);
-        if (chatIds.length > 0) {
-            const mostRecent = Object.values(state.chats).sort((a,b) => b.updatedAt - a.updatedAt)[0];
+        const workspaceChats = getWorkspaceChats();
+        if (workspaceChats.length > 0) {
+            const mostRecent = workspaceChats.sort((a,b) => b.updatedAt - a.updatedAt)[0];
             loadChat(mostRecent.id);
         } else {
             createNewChat();

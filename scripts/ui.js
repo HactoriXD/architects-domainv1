@@ -58,34 +58,40 @@
     function createNewChat() {
         const id = generateId();
         removeStreamingElement();
-        state.chats[id] = { id, title: 'New Ritual', messages: [], systemPrompt: '', pinnedNotes: '', lastUsage: null, createdAt: Date.now(), updatedAt: Date.now() };
+        const workspace = getActiveWorkspace();
+        state.chats[id] = { id, workspaceId: workspace?.id || state.activeWorkspaceId, title: 'New Chat', messages: [], systemPrompt: '', pinnedNotes: '', lastUsage: null, createdAt: Date.now(), updatedAt: Date.now() };
+        syncWorkspaceForChat(id, state.chats[id].workspaceId);
         state.currentChatId = id;
         state.messages = [];
         state.attachments = [];
-        state.savedSystemPrompt = '';
-        state.pinnedNotes = '';
+        state.savedSystemPrompt = workspace?.systemPrompt || '';
+        state.pinnedNotes = workspace?.pinnedNotes || '';
         state.lastUsage = null;
-        el.systemPrompt.value = '';
-        el.systemPromptBadge.style.display = 'none';
-        el.pinnedContext.value = '';
+        el.systemPrompt.value = state.savedSystemPrompt;
+        el.systemPromptBadge.style.display = state.savedSystemPrompt ? 'inline-block' : 'none';
+        el.pinnedContext.value = state.pinnedNotes;
+        updateSystemPromptStats();
         updatePinnedContextUI();
         renderAttachmentsPreview();
         renderMessages();
         resetConversationScroll('top');
         renderChatList();
         saveChats();
+        saveWorkspaces();
         updateContextInspector();
+        renderWorkspaceUi();
         return id;
     }
 
     function loadChat(id) {
         const chat = state.chats[id];
-        if (!chat) return;
+        if (!chat || chat.workspaceId !== state.activeWorkspaceId) return;
         removeStreamingElement();
         state.currentChatId = id;
         state.messages = [...chat.messages];
-        state.savedSystemPrompt = chat.systemPrompt || '';
-        state.pinnedNotes = chat.pinnedNotes || '';
+        const workspace = getActiveWorkspace();
+        state.savedSystemPrompt = chat.systemPrompt || workspace?.systemPrompt || '';
+        state.pinnedNotes = chat.pinnedNotes || workspace?.pinnedNotes || '';
         state.lastUsage = chat.lastUsage || null;
         el.systemPrompt.value = state.savedSystemPrompt;
         el.systemPromptBadge.style.display = state.savedSystemPrompt ? 'inline-block' : 'none';
@@ -109,10 +115,11 @@
     function deleteChat(id) {
         if (!confirm('Delete this chat?')) return;
         if (state.activeStream?.chatId === id && state.abortController) state.abortController.abort();
+        removeWorkspaceRelation(state.chats[id]?.workspaceId, 'chatIds', id);
         delete state.chats[id];
         if (state.currentChatId === id) {
-            const ids = Object.keys(state.chats);
-            ids.length > 0 ? loadChat(ids[0]) : createNewChat();
+            const chats = getWorkspaceChats().sort((a, b) => b.updatedAt - a.updatedAt);
+            chats.length > 0 ? loadChat(chats[0].id) : createNewChat();
         }
         renderChatList();
         saveChats();
@@ -154,8 +161,8 @@
     }
 
     function renderChatList(filter = '') {
-        const chats = Object.values(state.chats).filter(c => !filter || c.title.toLowerCase().includes(filter.toLowerCase())).sort((a,b) => b.updatedAt - a.updatedAt);
-        if (chats.length === 0) { el.chatList.innerHTML = '<div class="no-chats">No rituals yet</div>'; return; }
+        const chats = getWorkspaceChats().filter(c => !filter || c.title.toLowerCase().includes(filter.toLowerCase())).sort((a,b) => b.updatedAt - a.updatedAt);
+        if (chats.length === 0) { el.chatList.innerHTML = '<div class="no-chats">No chats in this workspace yet</div>'; return; }
         
         const now = Date.now();
         const day = 24*60*60*1000;
@@ -171,15 +178,22 @@
         let html = '';
         const renderSection = (title, items) => {
             if (items.length === 0) return '';
-            return `<div class="chat-list-section"><div class="chat-list-section-title">${title}</div>${items.map(c => `
+            return `<div class="chat-list-section"><div class="chat-list-section-title">${title}</div>${items.map(c => {
+                const previewParts = [];
+                if (c.messages.length) previewParts.push(`${c.messages.length} invocations`);
+                if (c.pinnedNotes) previewParts.push('pinned');
+                const preview = previewParts.join(' / ');
+                const previewHtml = preview ? `<div class="chat-item-preview">${escapeHtml(preview)}</div>` : '';
+                return `
                 <div class="chat-item ${c.id === state.currentChatId ? 'active' : ''}" data-id="${c.id}">
                     <div class="chat-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-                    <div class="chat-item-content"><div class="chat-item-title">${escapeHtml(c.title)}</div><div class="chat-item-preview">${c.messages.length ? `${c.messages.length} invocations` : 'Dormant'}${c.pinnedNotes ? ' · pinned' : ''}</div></div>
+                    <div class="chat-item-content"><div class="chat-item-title">${escapeHtml(c.title)}</div>${previewHtml}</div>
                     <div class="chat-item-actions">
                         <button class="chat-item-action" data-chat-action="rename" title="Rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                         <button class="chat-item-action delete" data-chat-action="delete" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                     </div>
-                </div>`).join('')}</div>`;
+                </div>`;
+            }).join('')}</div>`;
         };
         html += renderSection('Today', today);
         html += renderSection('Yesterday', yesterday);
@@ -202,6 +216,11 @@
     }
     function saveSystemPrompt() {
         state.savedSystemPrompt = el.systemPrompt.value.trim();
+        const workspace = getActiveWorkspace();
+        if (workspace) {
+            workspace.systemPrompt = state.savedSystemPrompt;
+            touchWorkspace(workspace.id);
+        }
         el.systemPromptBadge.style.display = state.savedSystemPrompt ? 'inline-block' : 'none';
         el.systemPromptSaved.classList.add('visible');
         setTimeout(() => el.systemPromptSaved.classList.remove('visible'), 2000);
@@ -215,6 +234,11 @@
     function clearSystemPrompt() {
         el.systemPrompt.value = '';
         state.savedSystemPrompt = '';
+        const workspace = getActiveWorkspace();
+        if (workspace) {
+            workspace.systemPrompt = '';
+            touchWorkspace(workspace.id);
+        }
         el.systemPromptBadge.style.display = 'none';
         updateSystemPromptStats();
         if (state.currentChatId && state.chats[state.currentChatId]) {
@@ -251,6 +275,11 @@
 
     function savePinnedContext() {
         state.pinnedNotes = el.pinnedContext.value.trim();
+        const workspace = getActiveWorkspace();
+        if (workspace) {
+            workspace.pinnedNotes = state.pinnedNotes;
+            touchWorkspace(workspace.id);
+        }
         updatePinnedContextUI();
         el.pinnedContextSaved.classList.add('visible');
         setTimeout(() => el.pinnedContextSaved.classList.remove('visible'), 2000);
@@ -268,6 +297,11 @@
     function clearPinnedContext() {
         el.pinnedContext.value = '';
         state.pinnedNotes = '';
+        const workspace = getActiveWorkspace();
+        if (workspace) {
+            workspace.pinnedNotes = '';
+            touchWorkspace(workspace.id);
+        }
         updatePinnedContextUI();
         if (state.currentChatId && state.chats[state.currentChatId]) {
             state.chats[state.currentChatId].pinnedNotes = '';
@@ -307,6 +341,9 @@
 
         const estimatedInput = draftTokens
             + estimateTokens(state.savedSystemPrompt)
+            + estimateTokens(getActiveWorkspace()?.workspaceNotes)
+            + getEnabledLorebooksForContext().reduce((acc, entry) => acc + estimateTokens(`${entry.title}\n${entry.content}`), 0)
+            + getEnabledImportedFilesForContext().reduce((acc, file) => acc + estimateTokens(file.content), 0)
             + estimateTokens(state.pinnedNotes)
             + getEnabledMemoriesForContext().reduce((acc, memory) => acc + estimateTokens(memory.content), 0)
             + state.messages.reduce((acc, m) => acc + estimateTokens(m.content), 0);
