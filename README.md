@@ -1,127 +1,179 @@
+# Architect's Domain
+
+**Architect's Domain** is a local-first, multi-provider AI workstation for people who want more control than a standard chatbot gives them.
+
+It combines streaming chat, bring-your-own API keys, persistent user-approved memory, image previews, MCP server foundations, and visible context inspection inside a restrained dark workstation interface.
+
+> Local-first means chats, settings, keys, memories, and context assembly stay in the browser. Model inference still uses external providers such as OpenRouter, DeepSeek, or Venice through your own API keys.
+
+## Demo
+
+> OBS capture slot: replace this placeholder with your demo GIF or video preview.
+
+```text
+assets/demo/architects-domain-demo.gif
+```
+
+Recommended capture:
+
+- 20 to 45 seconds
+- 1280x720 or 1920x1080
+- Show model selection, a short streaming reply, memory review, context sources, and the image lightbox
+- Keep API keys hidden
+
 ## Preview
 
 ![Architect's Domain UI](assets/main-ui.png)
 
-# Architect's Domain
+## Why It Exists
 
-Architect's Domain is a local first multi-model AI workstation built for power users, prompt engineers, roleplay creators, and AI explorers.
+Most AI chat interfaces hide too much. Architect's Domain is built around the opposite idea: the user should see and control the model, context, memory, provider, and stored data.
 
-The project started as a single experimental HTML file and evolved into a modular AI cockpit with persistent memory, streaming chat, provider switching, markdown rendering, and BYOAK architecture.
+The project is designed as a personal AI cockpit rather than a generic chatbot clone. It is meant for prompt engineers, roleplay creators, builders, researchers, and power users who want a transparent local workspace.
 
-## Features
+## Core Features
 
-* Multi-provider support
+- **Multi-provider chat**
+  - OpenRouter
+  - DeepSeek
+  - Venice.ai
 
-  * OpenRouter
-  * Venice.ai
-  * DeepSeek
+- **Bring-your-own API key**
+  - No backend secrets
+  - Keys are stored locally in browser storage
+  - Requests go directly from the browser to the selected provider
 
-* BYOAK architecture
+- **Streaming chat**
+  - Buffered SSE streaming
+  - Stable stream ownership
+  - Safe chat switching during generation
+  - Preserved partial output when stopping generation
 
-  * Users bring their own API keys
-  * No backend secrets required
-  * Keys stay inside browser localStorage
+- **Persistent memory**
+  - Local memory notes
+  - Suggested memories require user approval
+  - Accept, reject, edit, pin, disable, and delete controls
+  - Strict filtering to avoid low-value generic memories
 
-* Persistent pinned memory
+- **Context visibility**
+  - Context Sources inspector
+  - Shows system prompt, pinned notes, enabled memories, and MCP capabilities
+  - No silent memory saves
+  - No hidden tool execution
 
-  * Per-chat contextual memory
-  * Injected silently into requests
-  * Works across providers and models
+- **MCP foundation**
+  - Browser HTTP/SSE MCP server configuration
+  - Add, remove, enable, disable, and test server connections
+  - Capability listing for configured servers
+  - Designed for user-driven tool access, not autonomous workflows
 
-* Streaming chat system
+- **Image handling**
+  - Image attachments in chat
+  - Clickable previews
+  - Lightbox viewer with zoom, fit, original size, ESC close, and backdrop close
 
-  * Buffered SSE streaming
-  * Stable stream ownership
-  * Safe chat switching during generation
-  * Preserved partial outputs on stop
+- **Markdown and code rendering**
+  - Fenced code blocks
+  - Preserved indentation
+  - Inline formatting
+  - Streaming-safe final markdown rendering
 
-* Advanced markdown rendering
+- **Model cost awareness**
+  - Per-model pricing display where available
+  - Estimated message cost
+  - DeepSeek thinking mode toggle
 
-  * Fenced code blocks
-  * Syntax highlighting
-  * Inline formatting
-  * Better whitespace preservation
+## Local-First Security Model
 
-* Daily cockpit UX
+Architect's Domain does not require a database, account system, or hosted backend.
 
-  * Conversation navigation shortcuts
-  * Pinned context controls
-  * Export/import support
-  * Multi-chat workflow
+Stored locally:
 
-* Local-first architecture
+- API keys
+- chats
+- memory notes
+- settings
+- pinned context
+- MCP server configuration
 
-  * Static host compatible
-  * No required database
-  * No required authentication
-  * Portable and hackable
+Sent externally only when you choose to chat:
 
-## Philosophy
+- selected model request
+- current conversation context
+- approved memories that are enabled
+- attached files/images included in that message
 
-Architect's Domain is designed as an AI workstation instead of a minimal chatbot.
-
-The goal is to create a flexible environment where users can:
-
-* switch between providers instantly
-* preserve context and memory
-* experiment with prompts
-* build characters and systems
-* use frontier models without platform lock-in
+The app is transparent by design: the Context Sources inspector shows what durable context is entering the model.
 
 ## Tech Stack
 
-Frontend:
+- HTML
+- CSS
+- Vanilla JavaScript
+- LocalStorage
+- Static Node server for local development
 
-* HTML
-* CSS
-* Vanilla JavaScript
-
-Architecture:
-
-* Modular file structure
-* Static-host compatible
-* BYOAK provider flow
-
-Providers:
-
-* OpenRouter
-* Venice.ai
-* DeepSeek
+No React, Vue, Tailwind, bundler, Electron, or framework rewrite.
 
 ## Project Structure
 
 ```text
-/styles
-/scripts
+assets/
+scripts/
+  mcp/
+styles/
 index.html
 server.js
 package.json
+README.md
 ```
+
+## Run Locally
+
+```bash
+npm start
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+## Configuration
+
+1. Open settings.
+2. Select a provider.
+3. Add your local API key.
+4. Pick a model.
+5. Start chatting.
+
+Supported providers:
+
+- OpenRouter
+- DeepSeek
+- Venice.ai
 
 ## Hosting
 
-Architect's Domain can be hosted on:
+Architect's Domain is static-host compatible.
 
-* GitHub Pages
-* Netlify
-* Cloudflare Pages
-* Vercel static hosting
-* Any static web server
+It can be hosted on:
 
-## Security Model
+- GitHub Pages
+- Netlify
+- Cloudflare Pages
+- Vercel static hosting
+- Any static web server
 
-This project uses a strict BYOAK model.
-
-Users provide their own API keys locally. Keys are stored in browser localStorage and sent directly to the selected provider.
-
-The repository does not contain provider secrets.
+Provider calls are made from the browser, so CORS support depends on the selected provider.
 
 ## Status
 
 Public beta.
 
-The project is actively evolving and focused on experimentation, usability, and AI workflow design.
+The app is actively evolving toward a transparent, local-first AI workspace with stronger memory controls, better MCP integrations, and a more polished daily workflow.
 
 ## License
 
-No license yet.
+MIT
