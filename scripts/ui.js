@@ -35,6 +35,7 @@
     }
 
     function removeStreamingElement() {
+        if (typeof cancelStreamingRender === 'function') cancelStreamingRender();
         const streaming = document.getElementById('streaming-message');
         if (streaming) streaming.remove();
     }
@@ -73,6 +74,7 @@
         resetConversationScroll('top');
         renderChatList();
         saveChats();
+        updateContextInspector();
         return id;
     }
 
@@ -100,6 +102,7 @@
         requestAnimationFrame(() => resetConversationScroll('bottom'));
         renderChatList();
         updateStats();
+        updateContextInspector();
         closeSidebar();
     }
 
@@ -135,6 +138,21 @@
         closeRenameModal();
     }
 
+    function handleChatListClick(event) {
+        const action = event.target.closest('[data-chat-action]');
+        if (action) {
+            event.stopPropagation();
+            const chatId = action.closest('.chat-item')?.dataset.id;
+            if (!chatId) return;
+            if (action.dataset.chatAction === 'rename') openRenameModal(chatId);
+            if (action.dataset.chatAction === 'delete') deleteChat(chatId);
+            return;
+        }
+
+        const item = event.target.closest('.chat-item');
+        if (item?.dataset.id) loadChat(item.dataset.id);
+    }
+
     function renderChatList(filter = '') {
         const chats = Object.values(state.chats).filter(c => !filter || c.title.toLowerCase().includes(filter.toLowerCase())).sort((a,b) => b.updatedAt - a.updatedAt);
         if (chats.length === 0) { el.chatList.innerHTML = '<div class="no-chats">No rituals yet</div>'; return; }
@@ -156,10 +174,10 @@
             return `<div class="chat-list-section"><div class="chat-list-section-title">${title}</div>${items.map(c => `
                 <div class="chat-item ${c.id === state.currentChatId ? 'active' : ''}" data-id="${c.id}">
                     <div class="chat-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-                    <div class="chat-item-content"><div class="chat-item-title">${c.title}</div><div class="chat-item-preview">${c.messages.length ? `${c.messages.length} invocations` : 'Dormant'}${c.pinnedNotes ? ' · pinned' : ''}</div></div>
+                    <div class="chat-item-content"><div class="chat-item-title">${escapeHtml(c.title)}</div><div class="chat-item-preview">${c.messages.length ? `${c.messages.length} invocations` : 'Dormant'}${c.pinnedNotes ? ' · pinned' : ''}</div></div>
                     <div class="chat-item-actions">
-                        <button class="chat-item-action" onclick="event.stopPropagation();openRenameModal('${c.id}')" title="Rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                        <button class="chat-item-action delete" onclick="event.stopPropagation();deleteChat('${c.id}')" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                        <button class="chat-item-action" data-chat-action="rename" title="Rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                        <button class="chat-item-action delete" data-chat-action="delete" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                     </div>
                 </div>`).join('')}</div>`;
         };
@@ -168,7 +186,6 @@
         html += renderSection('This Week', week);
         html += renderSection('Older', older);
         el.chatList.innerHTML = html;
-        el.chatList.querySelectorAll('.chat-item').forEach(item => item.addEventListener('click', () => loadChat(item.dataset.id)));
     }
     window.openRenameModal = openRenameModal;
     window.deleteChat = deleteChat;
@@ -193,6 +210,7 @@
             saveChats();
         }
         showToast('System prompt applied', 'success');
+        updateContextInspector();
     }
     function clearSystemPrompt() {
         el.systemPrompt.value = '';
@@ -204,6 +222,7 @@
             saveChats();
         }
         updateStats();
+        updateContextInspector();
     }
 
     function applySystemPromptPreset(preset) {
@@ -242,6 +261,7 @@
             renderChatList();
         }
         updateStats();
+        updateContextInspector();
         showToast(state.pinnedNotes ? 'Pinned context applied' : 'Pinned context cleared', 'success');
     }
 
@@ -256,6 +276,7 @@
             renderChatList();
         }
         updateStats();
+        updateContextInspector();
         showToast('Pinned context cleared', 'success');
     }
 
@@ -280,17 +301,20 @@
             el.tokenUsageStat.title = draftTokens
                 ? `Exact provider usage plus ~${draftTokens} draft tokens`
                 : `Exact provider usage from ${state.lastUsage.provider} (${state.lastUsage.model})`;
+            updateSelectedModelCostDisplay();
             return;
         }
 
         const estimatedInput = draftTokens
             + estimateTokens(state.savedSystemPrompt)
             + estimateTokens(state.pinnedNotes)
+            + getEnabledMemoriesForContext().reduce((acc, memory) => acc + estimateTokens(memory.content), 0)
             + state.messages.reduce((acc, m) => acc + estimateTokens(m.content), 0);
         el.inputTokens.textContent = `~${formatContextSize(estimatedInput)}`;
         el.outputTokens.textContent = '~0';
         el.contextUsed.textContent = `~${formatContextSize(estimatedInput)}`;
         el.tokenUsageStat.title = 'Estimated locally until provider usage returns';
+        updateSelectedModelCostDisplay();
     }
 
     function updateSendButton() {

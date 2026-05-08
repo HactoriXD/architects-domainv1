@@ -23,6 +23,77 @@
         catch (e) { state.chats = {}; }
     }
 
+    function saveMemories() {
+        try {
+            localStorage.setItem(CONFIG.MEMORIES_KEY, JSON.stringify(state.memories));
+        } catch (e) {
+            console.error('Memory save failed:', e);
+        }
+    }
+
+    function loadMemories() {
+        try {
+            const saved = localStorage.getItem(CONFIG.MEMORIES_KEY);
+            state.memories = saved ? JSON.parse(saved) : [];
+            normalizeLoadedMemories();
+        } catch (e) {
+            state.memories = [];
+        }
+    }
+
+    function normalizeLoadedMemories() {
+        if (!Array.isArray(state.memories)) state.memories = [];
+        state.memories = state.memories.map(memory => {
+            const category = normalizeMemoryCategory(memory.category);
+            return {
+                id: memory.id || generateId(),
+                content: String(memory.content || '').trim(),
+                category,
+                confidence: Number(memory.confidence) || 0.6,
+                createdAt: memory.createdAt || Date.now(),
+                updatedAt: memory.updatedAt || memory.createdAt || Date.now(),
+                sourceChat: memory.sourceChat || null,
+                sourceMessage: memory.sourceMessage || null,
+                pinned: Boolean(memory.pinned),
+                enabled: memory.enabled !== false
+            };
+        }).filter(memory => memory.content && memory.category);
+    }
+
+    function saveMcpServers() {
+        try {
+            localStorage.setItem(CONFIG.MCP_SERVERS_KEY, JSON.stringify(state.mcpServers));
+        } catch (e) {
+            console.error('MCP server save failed:', e);
+        }
+    }
+
+    function loadMcpServers() {
+        try {
+            const saved = localStorage.getItem(CONFIG.MCP_SERVERS_KEY);
+            state.mcpServers = saved ? JSON.parse(saved) : [];
+            normalizeLoadedMcpServers();
+        } catch (e) {
+            state.mcpServers = [];
+        }
+    }
+
+    function normalizeLoadedMcpServers() {
+        if (!Array.isArray(state.mcpServers)) state.mcpServers = [];
+        state.mcpServers = state.mcpServers.map(server => ({
+            id: server.id || generateId(),
+            name: String(server.name || 'MCP Server').trim(),
+            type: server.type || 'custom',
+            endpoint: String(server.endpoint || '').trim(),
+            enabled: Boolean(server.enabled),
+            status: server.status || 'untested',
+            capabilities: Array.isArray(server.capabilities) ? server.capabilities : [],
+            createdAt: server.createdAt || Date.now(),
+            updatedAt: server.updatedAt || server.createdAt || Date.now(),
+            lastError: server.lastError || ''
+        })).filter(server => server.name);
+    }
+
     function normalizeLoadedChats() {
         for (const chat of Object.values(state.chats)) {
             if (!Array.isArray(chat.messages)) chat.messages = [];

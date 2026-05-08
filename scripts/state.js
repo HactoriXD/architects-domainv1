@@ -7,7 +7,9 @@
         SITE_URL: 'https://architects-domain.local',
         ASSISTANT_NAME: 'Assistant',
         STORAGE_KEY: 'architects_domain_chats',
-        SETTINGS_KEY: 'architects_domain_settings'
+        SETTINGS_KEY: 'architects_domain_settings',
+        MEMORIES_KEY: 'architects_domain_memories',
+        MCP_SERVERS_KEY: 'architects_domain_mcp_servers'
     };
 
     const VISION_MODELS = ['anthropic/claude-sonnet-4','anthropic/claude-3.5-sonnet','anthropic/claude-3-opus','anthropic/claude-3-sonnet','anthropic/claude-3-haiku','openai/gpt-4o','openai/gpt-4o-mini','openai/gpt-4-turbo','google/gemini-pro-1.5','google/gemini-flash-1.5','meta-llama/llama-3.2-90b-vision-instruct','meta-llama/llama-3.2-11b-vision-instruct'];
@@ -17,6 +19,31 @@
         research: 'You are a rigorous research analyst. Separate facts from inference, cite uncertainty, compare sources when available, and end with the clearest next question or decision.',
         journal: 'You are a reflective journaling companion. Be warm, grounded, and psychologically careful. Ask thoughtful questions, notice patterns, and never overclaim certainty.',
         lorekeeper: 'You are a lorekeeper for an evolving fictional domain. Preserve canon, track names and contradictions, deepen symbols, and turn scattered ideas into coherent mythology.'
+    };
+    const MODEL_PRICING_USD_PER_1M = {
+        deepseek: {
+            'deepseek-chat': { input: 0.27, output: 1.10, estimated: false },
+            'deepseek-reasoner': { input: 0.55, output: 2.19, estimated: false },
+            'deepseek-v4-flash': { input: 0.17, output: 0.35, estimated: true },
+            'deepseek-v4-pro': { input: 1.73, output: 3.80, estimated: true }
+        },
+        venice: {
+            'venice-uncensored': { input: 0.20, output: 0.90, estimated: true },
+            'venice-uncensored-1-2': { input: 0.20, output: 0.90, estimated: false },
+            'venice-uncensored-role-play': { input: 0.50, output: 2.00, estimated: false },
+            'deepseek-v3.2': { input: 0.33, output: 0.48, estimated: false },
+            'deepseek-v4-flash': { input: 0.17, output: 0.35, estimated: false },
+            'deepseek-v4-pro': { input: 1.73, output: 3.80, estimated: false },
+            'zai-org-glm-4.7-flash': { input: 0.13, output: 0.50, estimated: false },
+            'mistral-small-3-2-24b-instruct': { input: 0.09, output: 0.25, estimated: false },
+            'qwen3-235b-a22b-instruct-2507': { input: 0.15, output: 0.75, estimated: false },
+            'qwen3-235b-a22b-thinking-2507': { input: 0.45, output: 3.50, estimated: false }
+        }
+    };
+    const PROVIDER_PRICING_ESTIMATES_USD_PER_1M = {
+        deepseek: { input: 0.27, output: 1.10 },
+        venice: { input: 0.50, output: 2.00 },
+        openrouter: { input: 0, output: 0 }
     };
 
     // ============================================
@@ -40,6 +67,13 @@
         modelFilter: 'all',
         modelCategories: { roleplay: new Set(), coding: new Set() },
         pinnedNotes: '',
+        memories: [],
+        memorySuggestions: [],
+        memoryFilter: 'all',
+        memorySearch: '',
+        lightbox: { open: false, images: [], index: 0, zoom: 1, mode: 'fit' },
+        mcpServers: [],
+        mcpRegistry: [],
         followStream: true,
         activeStream: null,
         providerStatus: {},
@@ -78,6 +112,36 @@
         settingsImportInput: document.getElementById('settingsImportInput'),
         webSearchToggle: document.getElementById('webSearchToggle'),
         webSearchStatus: document.getElementById('webSearchStatus'),
+        contextInspectorBtn: document.getElementById('contextInspectorBtn'),
+        contextInspectorPanel: document.getElementById('contextInspectorPanel'),
+        contextSourcesList: document.getElementById('contextSourcesList'),
+        contextSourcesSummary: document.getElementById('contextSourcesSummary'),
+        memoryManagerBtn: document.getElementById('memoryManagerBtn'),
+        memoryModal: document.getElementById('memoryModal'),
+        memorySearch: document.getElementById('memorySearch'),
+        memoryCategoryFilter: document.getElementById('memoryCategoryFilter'),
+        memoryList: document.getElementById('memoryList'),
+        memoryEmpty: document.getElementById('memoryEmpty'),
+        memorySuggestions: document.getElementById('memorySuggestions'),
+        memorySuggestionsList: document.getElementById('memorySuggestionsList'),
+        memoryCloseBtn: document.getElementById('memoryCloseBtn'),
+        mcpServerType: document.getElementById('mcpServerType'),
+        mcpServerName: document.getElementById('mcpServerName'),
+        mcpServerEndpoint: document.getElementById('mcpServerEndpoint'),
+        mcpAddServerBtn: document.getElementById('mcpAddServerBtn'),
+        mcpServerList: document.getElementById('mcpServerList'),
+        lightboxModal: document.getElementById('lightboxModal'),
+        lightboxImage: document.getElementById('lightboxImage'),
+        lightboxTitle: document.getElementById('lightboxTitle'),
+        lightboxMeta: document.getElementById('lightboxMeta'),
+        lightboxClose: document.getElementById('lightboxClose'),
+        lightboxZoomIn: document.getElementById('lightboxZoomIn'),
+        lightboxZoomOut: document.getElementById('lightboxZoomOut'),
+        lightboxFit: document.getElementById('lightboxFit'),
+        lightboxOriginal: document.getElementById('lightboxOriginal'),
+        lightboxPrev: document.getElementById('lightboxPrev'),
+        lightboxNext: document.getElementById('lightboxNext'),
+        lightboxViewport: document.getElementById('lightboxViewport'),
         tempSlider: document.getElementById('tempSlider'),
         tempValue: document.getElementById('tempValue'),
         maxTokensSlider: document.getElementById('maxTokensSlider'),
@@ -90,6 +154,8 @@
         freqPenaltyValue: document.getElementById('freqPenaltyValue'),
         presPenaltySlider: document.getElementById('presPenaltySlider'),
         presPenaltyValue: document.getElementById('presPenaltyValue'),
+        deepSeekThinkingGroup: document.getElementById('deepSeekThinkingGroup'),
+        deepSeekThinkingToggle: document.getElementById('deepSeekThinkingToggle'),
         resetSettingsBtn: document.getElementById('resetSettingsBtn'),
         systemPromptContainer: document.getElementById('systemPromptContainer'),
         systemPromptHeader: document.getElementById('systemPromptHeader'),
@@ -153,11 +219,33 @@
         const perMillion = perToken * 1000000;
         return perMillion < 0.01 ? '$' + perMillion.toFixed(4) : perMillion < 1 ? '$' + perMillion.toFixed(3) : '$' + perMillion.toFixed(2);
     };
+    const formatPer1KCost = (value) => {
+        const cost = Number(value);
+        if (!Number.isFinite(cost)) return 'N/A';
+        if (cost === 0) return 'Free';
+        return cost < 0.001 ? `$${cost.toFixed(5)}` : cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(3)}`;
+    };
+    const formatDollarCost = (value) => {
+        const cost = Number(value);
+        if (!Number.isFinite(cost)) return 'N/A';
+        if (cost === 0) return 'Free';
+        return cost < 0.001 ? `$${cost.toFixed(5)}` : cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(3)}`;
+    };
     const formatFileSize = (bytes) => bytes < 1024 ? bytes+' B' : bytes < 1024*1024 ? (bytes/1024).toFixed(1)+' KB' : (bytes/(1024*1024)).toFixed(1)+' MB';
     const isVisionModel = (id) => VISION_MODELS.some(vm => id.includes(vm.split('/')[1]) || id === vm);
-    const hasFreePricing = (m) => m.pricing && ('prompt' in m.pricing || 'completion' in m.pricing) && parseFloat(m.pricing?.prompt || 0) === 0 && parseFloat(m.pricing?.completion || 0) === 0;
+    const hasFreePricing = (m) => Number(m.input_cost_per_1k_tokens) === 0 && Number(m.output_cost_per_1k_tokens) === 0;
     const getProvider = () => PROVIDERS[state.provider] || PROVIDERS[CONFIG.DEFAULT_PROVIDER];
     const getApiKey = () => (state.apiKeys[state.provider] || '').trim();
+
+    function debounce(fn, wait = 120) {
+        let timeoutId = null;
+        return function debounced(...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    const scheduleSaveSettings = debounce(() => saveSettings(), 180);
 
     function generateChatTitle(text) {
         if (!text) return 'New Ritual';
@@ -206,28 +294,103 @@
         return headers;
     }
 
+    function normalizeModelPricing(providerId, model) {
+        const id = String(model.id || model.model || model.name || '').toLowerCase();
+        const registry = MODEL_PRICING_USD_PER_1M[providerId]?.[id];
+        const rawPrompt = model.pricing?.prompt ?? model.pricing?.input;
+        const rawCompletion = model.pricing?.completion ?? model.pricing?.output;
+        const rawPromptNumber = parseFloat(rawPrompt);
+        const rawCompletionNumber = parseFloat(rawCompletion);
+        if (Number.isFinite(Number(model.input_cost_per_1k_tokens)) && Number.isFinite(Number(model.output_cost_per_1k_tokens))) {
+            return {
+                input: Number(model.input_cost_per_1k_tokens),
+                output: Number(model.output_cost_per_1k_tokens),
+                estimated: Boolean(model.pricing_estimated),
+                source: model.pricing_source || 'provider'
+            };
+        }
+        if (registry && (providerId === 'deepseek' || providerId === 'venice')) {
+            return {
+                input: registry.input / 1000,
+                output: registry.output / 1000,
+                estimated: registry.estimated,
+                source: registry.estimated ? 'estimated' : 'provider'
+            };
+        }
+        if (Number.isFinite(rawPromptNumber) && Number.isFinite(rawCompletionNumber)) {
+            return {
+                input: rawPromptNumber * 1000,
+                output: rawCompletionNumber * 1000,
+                estimated: Boolean(model.pricing?.estimated),
+                source: model.pricing?.source || 'provider'
+            };
+        }
+        if (registry) {
+            return {
+                input: registry.input / 1000,
+                output: registry.output / 1000,
+                estimated: registry.estimated,
+                source: registry.estimated ? 'estimated' : 'provider'
+            };
+        }
+        const estimate = PROVIDER_PRICING_ESTIMATES_USD_PER_1M[providerId] || PROVIDER_PRICING_ESTIMATES_USD_PER_1M.openrouter;
+        return {
+            input: estimate.input / 1000,
+            output: estimate.output / 1000,
+            estimated: true,
+            source: 'estimated'
+        };
+    }
+
+    function formatTokenPricing(model) {
+        const suffix = model.pricing_estimated ? ' est.' : '';
+        return `In ${formatPer1KCost(model.input_cost_per_1k_tokens)}/1K · Out ${formatPer1KCost(model.output_cost_per_1k_tokens)}/1K${suffix}`;
+    }
+
+    function estimateMessageCost(model, inputTokens, outputTokens) {
+        if (!model) return null;
+        const inputCost = (Math.max(0, inputTokens || 0) / 1000) * Number(model.input_cost_per_1k_tokens || 0);
+        const outputCost = (Math.max(0, outputTokens || 0) / 1000) * Number(model.output_cost_per_1k_tokens || 0);
+        return inputCost + outputCost;
+    }
+
+    function formatEstimatedMessageCost(model, inputTokens, outputTokens) {
+        const cost = estimateMessageCost(model, inputTokens, outputTokens);
+        return cost === null ? 'N/A' : formatDollarCost(cost);
+    }
+
     function normalizeModel(providerId, model) {
         const id = model.id || model.model || model.name;
+        const normalized = normalizeModelPricing(providerId, { ...model, id });
         return {
             ...model,
             id,
             name: model.name || model.id || id,
             provider: providerId,
             context_length: model.context_length || model.contextLength || model.model_spec?.capabilities?.optimizedForCode?.contextLength || 0,
-            pricing: model.pricing || {}
+            input_cost_per_1k_tokens: normalized.input,
+            output_cost_per_1k_tokens: normalized.output,
+            currency: 'USD',
+            pricing_estimated: normalized.estimated,
+            pricing_source: normalized.source,
+            pricing: {
+                ...(model.pricing || {}),
+                prompt: normalized.input / 1000,
+                completion: normalized.output / 1000
+            }
         };
     }
 
     function buildFallbackModels(providerId) {
         if (providerId === 'deepseek') {
             return [
-                { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', context_length: 128000, provider: providerId, pricing: {} },
-                { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', context_length: 128000, provider: providerId, pricing: {} }
+                normalizeModel(providerId, { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', context_length: 1000000 }),
+                normalizeModel(providerId, { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', context_length: 1000000 })
             ];
         }
         if (providerId === 'venice') {
             return [
-                { id: 'venice-uncensored', name: 'Venice Uncensored', context_length: 0, provider: providerId, pricing: {} }
+                normalizeModel(providerId, { id: 'venice-uncensored', name: 'Venice Uncensored', context_length: 128000 })
             ];
         }
         return [];

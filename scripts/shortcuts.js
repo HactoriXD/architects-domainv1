@@ -1,14 +1,24 @@
 // Event Listeners
     // ============================================
     function initEventListeners() {
+        const debouncedRenderChatList = debounce(() => renderChatList(el.chatSearch.value), 120);
+        const debouncedFilterModels = debounce(() => filterModels(el.modelSearch.value), 120);
+        const persistSliderSetting = (key, value, label, formatter = String) => {
+            state.settings[key] = value;
+            label.textContent = formatter(value);
+            scheduleSaveSettings();
+        };
+
         el.sidebarToggle.addEventListener('click', toggleSidebar);
         el.sidebarClose.addEventListener('click', toggleSidebar);
         el.sidebarOverlay.addEventListener('click', closeSidebar);
         el.newChatBtn.addEventListener('click', () => { createNewChat(); closeSidebar(); });
-        el.chatSearch.addEventListener('input', (e) => renderChatList(e.target.value));
+        el.chatList.addEventListener('click', handleChatListClick);
+        el.chatSearch.addEventListener('input', debouncedRenderChatList);
 
         el.modelSelectorBtn.addEventListener('click', toggleModelDropdown);
-        el.modelSearch.addEventListener('input', (e) => filterModels(e.target.value));
+        el.modelList.addEventListener('click', handleModelListClick);
+        el.modelSearch.addEventListener('input', debouncedFilterModels);
         el.modelFilterRow.addEventListener('click', (e) => {
             const chip = e.target.closest('.model-filter-chip');
             if (chip) setModelFilter(chip.dataset.filter);
@@ -23,11 +33,12 @@
         el.providerSelect.addEventListener('change', (e) => changeProvider(e.target.value));
         el.apiKeyInput.addEventListener('input', (e) => {
             state.apiKeys[state.provider] = e.target.value.trim();
-            setProviderStatus(state.provider, e.target.value.trim() ? 'untested' : 'missing');
-            saveSettings();
+            state.providerStatus[state.provider] = e.target.value.trim() ? 'untested' : 'missing';
+            updateProviderStatusUI();
+            scheduleSaveSettings();
             updateSendButton();
         });
-        el.apiKeyInput.addEventListener('change', () => fetchModels());
+        el.apiKeyInput.addEventListener('change', () => { saveSettings(); fetchModels(); });
         el.testProviderBtn.addEventListener('click', testProviderConnection);
         el.clearLocalKeysBtn.addEventListener('click', clearLocalKeys);
         el.exportSettingsBtn.addEventListener('click', exportEncryptedSettings);
@@ -37,12 +48,16 @@
             e.target.value = '';
         });
         el.webSearchToggle.addEventListener('click', toggleWebSearch);
-        el.tempSlider.addEventListener('input', (e) => { state.settings.temperature = parseFloat(e.target.value); el.tempValue.textContent = state.settings.temperature.toFixed(1); saveSettings(); });
-        el.maxTokensSlider.addEventListener('input', (e) => { state.settings.maxTokens = parseInt(e.target.value); el.maxTokensValue.textContent = state.settings.maxTokens.toLocaleString(); saveSettings(); });
-        el.topPSlider.addEventListener('input', (e) => { state.settings.topP = parseFloat(e.target.value); el.topPValue.textContent = state.settings.topP.toFixed(2); saveSettings(); });
-        el.topKSlider.addEventListener('input', (e) => { state.settings.topK = parseInt(e.target.value); el.topKValue.textContent = state.settings.topK; saveSettings(); });
-        el.freqPenaltySlider.addEventListener('input', (e) => { state.settings.frequencyPenalty = parseFloat(e.target.value); el.freqPenaltyValue.textContent = state.settings.frequencyPenalty.toFixed(1); saveSettings(); });
-        el.presPenaltySlider.addEventListener('input', (e) => { state.settings.presencePenalty = parseFloat(e.target.value); el.presPenaltyValue.textContent = state.settings.presencePenalty.toFixed(1); saveSettings(); });
+        el.tempSlider.addEventListener('input', (e) => persistSliderSetting('temperature', parseFloat(e.target.value), el.tempValue, v => v.toFixed(1)));
+        el.maxTokensSlider.addEventListener('input', (e) => persistSliderSetting('maxTokens', parseInt(e.target.value), el.maxTokensValue, v => v.toLocaleString()));
+        el.topPSlider.addEventListener('input', (e) => persistSliderSetting('topP', parseFloat(e.target.value), el.topPValue, v => v.toFixed(2)));
+        el.topKSlider.addEventListener('input', (e) => persistSliderSetting('topK', parseInt(e.target.value), el.topKValue));
+        el.freqPenaltySlider.addEventListener('input', (e) => persistSliderSetting('frequencyPenalty', parseFloat(e.target.value), el.freqPenaltyValue, v => v.toFixed(1)));
+        el.presPenaltySlider.addEventListener('input', (e) => persistSliderSetting('presencePenalty', parseFloat(e.target.value), el.presPenaltyValue, v => v.toFixed(1)));
+        [el.tempSlider, el.maxTokensSlider, el.topPSlider, el.topKSlider, el.freqPenaltySlider, el.presPenaltySlider].forEach(slider => {
+            slider.addEventListener('change', saveSettings);
+        });
+        el.deepSeekThinkingToggle.addEventListener('change', (e) => setDeepSeekThinkingEnabled(e.target.checked));
         el.resetSettingsBtn.addEventListener('click', resetSettings);
 
         el.systemPromptHeader.addEventListener('click', toggleSystemPrompt);
@@ -142,10 +157,16 @@
             
             // Escape - stop generation or close modals
             if (e.key === 'Escape') {
-                if (state.isStreaming) { stopGeneration(); e.preventDefault(); }
+                if (state.lightbox?.open) { closeLightbox(); e.preventDefault(); }
+                else if (el.memoryModal.classList.contains('open')) { el.memoryModal.classList.remove('open'); e.preventDefault(); }
+                else if (state.isStreaming) { stopGeneration(); e.preventDefault(); }
                 else if (el.shortcutsModal.classList.contains('open')) { closeShortcutsModal(); e.preventDefault(); }
                 else if (el.renameModal.classList.contains('open')) { closeRenameModal(); e.preventDefault(); }
             }
+            if (state.lightbox?.open && e.key === '+') { e.preventDefault(); adjustLightboxZoom(0.25); }
+            if (state.lightbox?.open && e.key === '-') { e.preventDefault(); adjustLightboxZoom(-0.25); }
+            if (state.lightbox?.open && e.key === 'ArrowLeft') { e.preventDefault(); moveLightbox(-1); }
+            if (state.lightbox?.open && e.key === 'ArrowRight') { e.preventDefault(); moveLightbox(1); }
             
             // Ctrl+Shift+O - New ritual
             if (ctrl && e.shiftKey && e.key === 'O') { e.preventDefault(); createNewChat(); }
@@ -192,6 +213,8 @@
         el.freqPenaltyValue.textContent = state.settings.frequencyPenalty.toFixed(1);
         el.presPenaltySlider.value = state.settings.presencePenalty;
         el.presPenaltyValue.textContent = state.settings.presencePenalty.toFixed(1);
+        updateDeepSeekThinkingUI();
+        updateSelectedModelCostDisplay();
     }
 
     function resetSettings() {

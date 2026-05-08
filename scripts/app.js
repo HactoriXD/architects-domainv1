@@ -19,8 +19,14 @@
     // ============================================
     async function init() {
         loadChats();
+        loadMemories();
+        initMcpRegistry();
+        loadMcpServers();
         loadSettings();
         initEventListeners();
+        initLightbox();
+        initMemory();
+        initMcpUi();
         await fetchModels();
         
         const chatIds = Object.keys(state.chats);
@@ -35,6 +41,7 @@
         updatePinnedContextUI();
         updateStats();
         updateConversationNavState();
+        updateContextInspector();
         el.messageInput.focus();
         
         // Show welcome toast on first visit

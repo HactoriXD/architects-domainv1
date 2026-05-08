@@ -107,8 +107,8 @@ function renderMessages() {
             const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             let attachmentsHtml = '';
             if (msg.attachments?.length) {
-                attachmentsHtml = '<div class="message-attachments">' + msg.attachments.map(att => att.type === 'image'
-                    ? `<div class="message-attachment image"><img src="${att.data}" alt="${escapeHtml(att.name)}"></div>`
+                attachmentsHtml = '<div class="message-attachments">' + msg.attachments.map((att, attachmentIndex) => att.type === 'image'
+                    ? `<button class="message-attachment image" type="button" onclick="openMessageImage(${i}, ${attachmentIndex})" title="Open image"><img src="${att.data}" alt="${escapeHtml(att.name)}" loading="lazy"></button>`
                     : `<div class="message-attachment file"><div class="file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="file-info"><div class="file-name">${escapeHtml(att.name)}</div><div class="file-size">${formatFileSize(att.size)}</div></div></div>`
                 ).join('') + '</div>';
             }
@@ -172,15 +172,31 @@ function renderMessages() {
         if (options.scroll !== false) scrollToBottom();
     }
 
-    function updateStreamingMessage(content) {
-        if (state.activeStream) state.activeStream.content = content;
+    let pendingStreamingContent = '';
+    let streamingRenderFrame = null;
+
+    function cancelStreamingRender() {
+        if (streamingRenderFrame !== null) {
+            cancelAnimationFrame(streamingRenderFrame);
+            streamingRenderFrame = null;
+        }
+        pendingStreamingContent = '';
+    }
+
+    function renderPendingStreamingMessage() {
+        streamingRenderFrame = null;
         if (state.activeStream && state.activeStream.chatId !== state.currentChatId) return;
         const div = document.getElementById('streaming-message');
         if (div) {
             const shouldFollowStream = state.followStream && isNearMessageBottom(120);
             const body = div.querySelector('.message-body');
-            body.style.whiteSpace = '';
-            body.innerHTML = formatMessageContent(content, false, true);
+            if (pendingStreamingContent.includes('```')) {
+                body.style.whiteSpace = '';
+                body.innerHTML = formatMessageContent(pendingStreamingContent, false, true);
+            } else {
+                body.style.whiteSpace = 'pre-wrap';
+                body.textContent = pendingStreamingContent;
+            }
             if (shouldFollowStream) {
                 scrollToBottom({ behavior: 'auto' });
             } else {
@@ -188,5 +204,14 @@ function renderMessages() {
                 checkScrollPosition();
             }
             updateConversationNavState();
+        }
+    }
+
+    function updateStreamingMessage(content) {
+        if (state.activeStream) state.activeStream.content = content;
+        if (state.activeStream && state.activeStream.chatId !== state.currentChatId) return;
+        pendingStreamingContent = String(content ?? '');
+        if (streamingRenderFrame === null) {
+            streamingRenderFrame = requestAnimationFrame(renderPendingStreamingMessage);
         }
     }

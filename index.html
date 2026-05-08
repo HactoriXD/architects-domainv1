@@ -72,6 +72,17 @@
                     <span id="webSearchStatus">Off</span>
                     <span class="toggle-track" aria-hidden="true"></span>
                 </button>
+                <div class="context-toggle">
+                    <button class="btn btn-icon" id="contextInspectorBtn" title="Context sources"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="8" cy="7" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="17" r="1"/></svg></button>
+                    <div class="context-inspector-panel" id="contextInspectorPanel">
+                        <div class="context-inspector-header">
+                            <h3 class="settings-title">Context Sources</h3>
+                            <span class="context-summary" id="contextSourcesSummary">0 active</span>
+                        </div>
+                        <div class="context-sources-list" id="contextSourcesList"></div>
+                    </div>
+                </div>
+                <button class="btn btn-icon" id="memoryManagerBtn" title="Memory manager"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 4 6v3h6v-3c2-1 4-3 4-6a7 7 0 0 0-7-7z"/><path d="M9 21h6"/><path d="M10 10h4"/></svg></button>
                 <!-- Export -->
                 <div class="export-toggle">
                     <button class="btn btn-icon" id="exportBtn" title="Export chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
@@ -118,6 +129,25 @@
                             <div class="settings-hint">Optional encrypted backup for local provider keys and generation settings.</div>
                         </div>
                         <div class="settings-divider"></div>
+                        <h3 class="settings-title">MCP Servers</h3>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Server Type</span></div>
+                            <select class="settings-select" id="mcpServerType"></select>
+                            <div class="settings-hint">Browser HTTP/SSE endpoints only. Stdio presets require an external bridge URL.</div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Server Name</span></div>
+                            <input type="text" class="settings-input" id="mcpServerName" placeholder="Project filesystem, GitHub, vault...">
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>HTTP Endpoint</span></div>
+                            <input type="url" class="settings-input" id="mcpServerEndpoint" placeholder="http://localhost:7331/mcp">
+                            <div class="provider-actions">
+                                <button class="btn" id="mcpAddServerBtn" type="button">Add Server</button>
+                            </div>
+                        </div>
+                        <div class="mcp-server-list" id="mcpServerList"></div>
+                        <div class="settings-divider"></div>
                         <h3 class="settings-title">Generation Settings</h3>
                         <div class="settings-group">
                             <div class="settings-label"><span>Temperature</span><span class="settings-value" id="tempValue">0.7</span></div>
@@ -148,6 +178,15 @@
                             <div class="settings-label"><span>Presence Penalty</span><span class="settings-value" id="presPenaltyValue">0.0</span></div>
                             <input type="range" class="settings-slider" id="presPenaltySlider" min="0" max="2" step="0.1" value="0">
                             <div class="settings-hint">Encourages new topics</div>
+                        </div>
+                        <div class="settings-group deepseek-thinking-group" id="deepSeekThinkingGroup" hidden>
+                            <label class="settings-check-row" for="deepSeekThinkingToggle">
+                                <input type="checkbox" id="deepSeekThinkingToggle">
+                                <span>
+                                    <strong>Enable Thinking Mode</strong>
+                                    <small>Allows the model to use extended reasoning (slower, more expensive)</small>
+                                </span>
+                            </label>
                         </div>
                         <div class="settings-divider"></div>
                         <button class="btn settings-reset-btn" id="resetSettingsBtn">Reset to Defaults</button>
@@ -206,6 +245,17 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="memory-suggestions" id="memorySuggestions" hidden>
+                <div class="memory-suggestions-header">
+                    <div>
+                        <span class="memory-suggestions-kicker">Suggested memories</span>
+                        <strong>Review before saving</strong>
+                    </div>
+                    <span class="memory-suggestions-note">Nothing is stored until accepted.</span>
+                </div>
+                <div class="memory-suggestions-list" id="memorySuggestionsList"></div>
             </div>
 
             <div class="messages-container" id="messagesContainer">
@@ -314,10 +364,61 @@
         </div>
     </div>
 
+    <div class="modal-overlay image-lightbox" id="lightboxModal">
+        <div class="lightbox-shell">
+            <div class="lightbox-toolbar">
+                <div class="lightbox-info">
+                    <div class="lightbox-title" id="lightboxTitle">Image</div>
+                    <div class="lightbox-meta" id="lightboxMeta"></div>
+                </div>
+                <div class="lightbox-actions">
+                    <button class="btn btn-icon" id="lightboxZoomOut" title="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="8" y1="11" x2="14" y2="11"/><path d="M21 21l-4.35-4.35"/></svg></button>
+                    <button class="btn btn-icon" id="lightboxZoomIn" title="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><path d="M21 21l-4.35-4.35"/></svg></button>
+                    <button class="btn" id="lightboxFit" type="button">Fit</button>
+                    <button class="btn" id="lightboxOriginal" type="button">Original</button>
+                    <button class="btn btn-icon" id="lightboxClose" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                </div>
+            </div>
+            <div class="lightbox-viewport" id="lightboxViewport">
+                <button class="lightbox-nav lightbox-prev" id="lightboxPrev" title="Previous image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+                <img id="lightboxImage" alt="">
+                <button class="lightbox-nav lightbox-next" id="lightboxNext" title="Next image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="memoryModal">
+        <div class="modal memory-modal">
+            <h3 class="modal-title">Memory Manager</h3>
+            <div class="memory-manager-controls">
+                <input type="text" class="modal-input" id="memorySearch" placeholder="Search memories...">
+                <select class="settings-select" id="memoryCategoryFilter">
+                    <option value="all">All categories</option>
+                    <option value="identity">Identity</option>
+                    <option value="preference">Preferences</option>
+                    <option value="relationship">Relationships</option>
+                    <option value="project">Projects</option>
+                    <option value="goal">Long-term goals</option>
+                </select>
+            </div>
+            <div class="memory-list" id="memoryList"></div>
+            <div class="memory-empty" id="memoryEmpty">No saved memories yet.</div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="memoryCloseBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="scripts/state.js" defer></script>
     <script src="scripts/storage.js" defer></script>
+    <script src="scripts/mcp/registry.js" defer></script>
+    <script src="scripts/mcp/client.js" defer></script>
+    <script src="scripts/mcp/manager.js" defer></script>
+    <script src="scripts/mcp/ui.js" defer></script>
+    <script src="scripts/memory.js" defer></script>
+    <script src="scripts/lightbox.js" defer></script>
     <script src="scripts/ui.js" defer></script>
     <script src="scripts/providers.js" defer></script>
     <script src="scripts/markdown.js" defer></script>

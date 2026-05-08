@@ -183,6 +183,7 @@ async function readStreamingCompletion(response) {
 
         const userMessage = { role: 'user', content: content || '(attached files)', timestamp: Date.now(), attachments: [...state.attachments] };
         state.messages.push(userMessage);
+        const userMessageIndex = state.messages.length - 1;
         
         el.messageInput.value = '';
         autoResizeTextarea(el.messageInput);
@@ -191,6 +192,7 @@ async function readStreamingCompletion(response) {
         renderMessages();
         syncCurrentChatMessages();
         saveChats();
+        if (typeof queueMemorySuggestionsForMessage === 'function') queueMemorySuggestionsForMessage(userMessage, userMessageIndex);
         renderChatList();
         scrollToBottom();
         

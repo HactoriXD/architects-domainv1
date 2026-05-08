@@ -96,8 +96,11 @@ const PROVIDERS = {
         if (filteredModels.length === 0) { el.modelList.innerHTML = '<div class="loading-models">No models match this filter</div>'; return; }
         const renderItems = (items) => items.map(m => {
             const ctx = formatContextSize(m.context_length || 0);
-            const inP = formatPrice(m.pricing?.prompt || 0), outP = formatPrice(m.pricing?.completion || 0);
+            const tokenPricing = formatTokenPricing(m);
+            const oneMessageCost = formatEstimatedMessageCost(m, 1000, 1000);
             const traits = getModelTraits(m);
+            const modelId = escapeHtml(m.id);
+            const modelName = escapeHtml(m.name || m.id);
             const badges = [
                 traits.free ? '<span class="model-badge free">Free</span>' : (state.provider === 'openrouter' ? '<span class="model-badge paid">Paid</span>' : ''),
                 traits.vision ? '<span class="model-badge vision">Vision</span>' : '',
@@ -105,9 +108,9 @@ const PROVIDERS = {
                 traits.coding ? '<span class="model-badge coding">Coding</span>' : '',
                 traits.roleplay ? '<span class="model-badge roleplay">Roleplay</span>' : ''
             ].join('');
-            return `<div class="model-item ${state.selectedModel?.id === m.id ? 'selected' : ''}" data-model-id="${m.id}">
-                <div class="model-item-header"><div class="model-item-name"><span>${m.name || m.id}</span>${badges}</div><span class="model-item-context">${ctx} ctx</span></div>
-                <div class="model-item-meta">${getProvider().label} &middot; In: ${inP}/M &middot; Out: ${outP}/M</div></div>`;
+            return `<div class="model-item ${state.selectedModel?.id === m.id ? 'selected' : ''}" data-model-id="${modelId}">
+                <div class="model-item-header"><div class="model-item-name"><span>${modelName}</span>${badges}</div><span class="model-item-context">${ctx} ctx</span></div>
+                <div class="model-item-meta">${getProvider().label} &middot; ${tokenPricing} &middot; ${oneMessageCost}/1K+1K</div></div>`;
         }).join('');
         if (state.provider === 'openrouter') {
             const paidModels = filteredModels.filter(m => !getModelTraits(m).free);
@@ -119,10 +122,16 @@ const PROVIDERS = {
         } else {
             el.modelList.innerHTML = renderItems(filteredModels);
         }
-        el.modelList.querySelectorAll('.model-item').forEach(item => item.addEventListener('click', () => {
-            const model = state.models.find(m => m.id === item.dataset.modelId);
-            if (model) { selectModel(model); closeModelDropdown(); }
-        }));
+    }
+
+    function handleModelListClick(event) {
+        const item = event.target.closest('.model-item');
+        if (!item?.dataset.modelId) return;
+        const model = state.models.find(m => m.id === item.dataset.modelId);
+        if (model) {
+            selectModel(model);
+            closeModelDropdown();
+        }
     }
 
     function selectModel(model) {
@@ -133,15 +142,42 @@ const PROVIDERS = {
             settings: { ...state.settings }
         };
         el.selectedProviderName.textContent = getProvider().label;
-        el.selectedModelName.textContent = (model.name || model.id).replace(/^[^:]+:\s*/, '');
+        updateSelectedModelCostDisplay();
         el.visionBadge.style.display = isVisionModel(model.id) ? 'inline-block' : 'none';
         el.modelList.querySelectorAll('.model-item').forEach(item => item.classList.toggle('selected', item.dataset.modelId === model.id));
         if (model.context_length) el.contextMax.textContent = formatContextSize(model.context_length);
+        updateDeepSeekThinkingUI();
         updateStats();
         saveSettings();
     }
 
-    function filterModels(query) { renderModelList(state.models.filter(m => m.id.toLowerCase().includes(query.toLowerCase()) || (m.name && m.name.toLowerCase().includes(query.toLowerCase())))); }
+    function updateSelectedModelCostDisplay() {
+        if (!state.selectedModel || !el.selectedModelName) return;
+        const name = (state.selectedModel.name || state.selectedModel.id).replace(/^[^:]+:\s*/, '');
+        const inputTokens = estimateCurrentInputTokens();
+        const outputTokens = Number(state.settings.maxTokens) || 0;
+        const cost = formatEstimatedMessageCost(state.selectedModel, inputTokens, outputTokens);
+        el.selectedModelName.textContent = `${name} · ~${cost}/msg`;
+        el.selectedModelName.title = `${formatTokenPricing(state.selectedModel)}. Message estimate uses current context plus max output tokens.`;
+    }
+
+    function estimateCurrentInputTokens() {
+        const draftTokens = estimateTokens(el.messageInput?.value || '');
+        return draftTokens
+            + estimateTokens(state.savedSystemPrompt)
+            + estimateTokens(state.pinnedNotes)
+            + getEnabledMemoriesForContext().reduce((acc, memory) => acc + estimateTokens(memory.content), 0)
+            + state.messages.reduce((acc, message) => acc + estimateTokens(message.content), 0);
+    }
+
+    function filterModels(query) {
+        const normalizedQuery = query.trim().toLowerCase();
+        if (!normalizedQuery) {
+            renderModelList(state.models);
+            return;
+        }
+        renderModelList(state.models.filter(m => m.id.toLowerCase().includes(normalizedQuery) || (m.name && m.name.toLowerCase().includes(normalizedQuery))));
+    }
     function setModelFilter(filter) {
         state.modelFilter = filter;
         el.modelFilterRow.querySelectorAll('.model-filter-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.filter === filter));
@@ -164,6 +200,7 @@ const PROVIDERS = {
         el.modelFilterRow.querySelectorAll('.model-filter-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.filter === state.modelFilter));
         updateProviderStatusUI();
         updateWebSearchUI();
+        updateDeepSeekThinkingUI();
     }
 
     function updateWebSearchUI() {
@@ -173,6 +210,31 @@ const PROVIDERS = {
         el.webSearchToggle.title = provider.supportsWebSearch
             ? `${provider.label} web search is ${state.webSearchEnabled ? 'on' : 'off'}`
             : `${provider.label} direct API does not expose web search`;
+    }
+
+    function getDeepSeekThinkingEnabled(modelId = state.selectedModel?.id) {
+        if (!modelId) return false;
+        return Boolean(state.providerSettings.deepseek?.thinkingByModel?.[modelId]);
+    }
+
+    function setDeepSeekThinkingEnabled(enabled, modelId = state.selectedModel?.id) {
+        if (!modelId) return;
+        state.providerSettings.deepseek = {
+            ...(state.providerSettings.deepseek || {}),
+            thinkingByModel: {
+                ...(state.providerSettings.deepseek?.thinkingByModel || {}),
+                [modelId]: Boolean(enabled)
+            }
+        };
+        saveSettings();
+        updateDeepSeekThinkingUI();
+    }
+
+    function updateDeepSeekThinkingUI() {
+        if (!el.deepSeekThinkingGroup || !el.deepSeekThinkingToggle) return;
+        const isDeepSeekModel = state.provider === 'deepseek' && Boolean(state.selectedModel);
+        el.deepSeekThinkingGroup.hidden = !isDeepSeekModel;
+        el.deepSeekThinkingToggle.checked = isDeepSeekModel && getDeepSeekThinkingEnabled();
     }
 
     async function changeProvider(providerId) {
@@ -196,7 +258,8 @@ const PROVIDERS = {
         state.providerSettings[state.provider] = {
             ...(state.providerSettings[state.provider] || {}),
             selectedModelId: state.selectedModel?.id || state.providerSettings[state.provider]?.selectedModelId || null,
-            settings: { ...state.settings }
+            settings: { ...state.settings },
+            thinkingByModel: { ...(state.providerSettings[state.provider]?.thinkingByModel || {}) }
         };
     }
 
@@ -294,6 +357,11 @@ const PROVIDERS = {
                 enable_web_citations: true
             };
         }
+        if (state.provider === 'deepseek') {
+            const thinkingEnabled = getDeepSeekThinkingEnabled(state.selectedModel?.id);
+            requestBody.thinking = { type: thinkingEnabled ? 'enabled' : 'disabled' };
+            if (thinkingEnabled) requestBody.reasoning_effort = 'high';
+        }
 
         return requestBody;
     }
@@ -340,6 +408,31 @@ function buildPinnedContextMessage(notes) {
         };
     }
 
+    const MEMORY_CATEGORY_ORDER = ['identity', 'preference', 'relationship', 'project', 'goal'];
+
+    function getEnabledMemoriesForContext() {
+        return [...state.memories]
+            .filter(memory => memory.enabled && memory.content)
+            .sort((a, b) => {
+                if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+                const aCategory = MEMORY_CATEGORY_ORDER.indexOf(a.category);
+                const bCategory = MEMORY_CATEGORY_ORDER.indexOf(b.category);
+                const categoryCompare = (aCategory === -1 ? 999 : aCategory) - (bCategory === -1 ? 999 : bCategory);
+                if (categoryCompare !== 0) return categoryCompare;
+                if ((a.updatedAt || 0) !== (b.updatedAt || 0)) return (a.updatedAt || 0) - (b.updatedAt || 0);
+                return String(a.id).localeCompare(String(b.id));
+            });
+    }
+
+    function buildMemoryContextMessage(memories = getEnabledMemoriesForContext()) {
+        if (!memories.length) return null;
+        const lines = memories.map(memory => `- [${memory.category}${memory.pinned ? ', pinned' : ''}] ${memory.content}`);
+        return {
+            role: 'system',
+            content: `Persistent user-approved memory. Use these notes as durable context, but do not mention them unless directly relevant.\n\n${lines.join('\n')}`
+        };
+    }
+
     function messageToApiMessage(msg) {
         if (msg.attachments?.length && msg.role === 'user') {
             const contentParts = [];
@@ -365,6 +458,8 @@ function buildPinnedContextMessage(notes) {
         if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
         const pinnedMessage = buildPinnedContextMessage(pinnedNotes);
         if (pinnedMessage) apiMessages.push(pinnedMessage);
+        const memoryMessage = buildMemoryContextMessage();
+        if (memoryMessage) apiMessages.push(memoryMessage);
         for (const msg of messages) apiMessages.push(messageToApiMessage(msg));
         return apiMessages;
     }
