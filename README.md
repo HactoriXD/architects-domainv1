@@ -8,18 +8,11 @@ It combines streaming chat, bring-your-own API keys, persistent user-approved me
 
 ## Demo
 
-> OBS capture slot: replace this placeholder with your demo GIF or video preview.
+Watch the current walkthrough:
 
-```text
-assets/demo/architects-domain-demo.gif
-```
+[Architect's Domain demo video](assets/demo/architects-domain-demo.mp4)
 
-Recommended capture:
-
-- 20 to 45 seconds
-- 1280x720 or 1920x1080
-- Show model selection, a short streaming reply, memory review, context sources, and the image lightbox
-- Keep API keys hidden
+> If GitHub does not show the MP4 inline, open the link directly from the repository.
 
 ## Preview
 
