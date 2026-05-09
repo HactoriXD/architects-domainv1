@@ -53,6 +53,14 @@
         return text + (text.endsWith('\n') ? '' : '\n') + '```';
     }
 
+    function sanitizeMarkdownUrl(url) {
+        const trimmed = String(url || '').trim().replace(/&amp;/g, '&');
+        if (/^(https?:|mailto:)/i.test(trimmed) || /^[./#][^\s]*$/.test(trimmed)) {
+            return trimmed.replace(/"/g, '%22').replace(/</g, '%3C').replace(/>/g, '%3E');
+        }
+        return '#';
+    }
+
     function formatMessageContent(content, forEdit = false, isStreaming = false) {
         if (forEdit) return content;
 
@@ -100,7 +108,7 @@
             .replace(/`([^`]+)`/g, '<code>$1</code>')
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
             .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => `<a href="${sanitizeMarkdownUrl(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`);
 
         // 6. Lists
         formatted = formatted.replace(/((?:^|\n)\d+\.\s+.+(?:\n|$))+/gm, (match) => {

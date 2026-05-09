@@ -369,6 +369,11 @@ const PROVIDERS = {
         if (state.webSearchEnabled && provider.searchMode === 'openrouter-tool') {
             requestBody.tools = [{ type: 'openrouter:web_search', parameters: { max_results: 5, search_context_size: 'medium' } }];
         }
+        const mcpTools = typeof buildProviderToolDefinitions === 'function' ? buildProviderToolDefinitions() : [];
+        if (mcpTools.length && !(state.webSearchEnabled && provider.searchMode === 'openrouter-tool')) {
+            requestBody.tools = mcpTools;
+            requestBody.tool_choice = 'auto';
+        }
         if (state.webSearchEnabled && provider.searchMode === 'venice-parameters') {
             requestBody.venice_parameters = {
                 enable_web_search: 'on',
@@ -499,19 +504,14 @@ const PROVIDERS = {
     }
 
     function buildMcpCapabilityContextMessage() {
-        const servers = getWorkspaceMcpServers().filter(server => server.enabled);
-        if (!servers.length) return null;
-        const lines = servers.map(server => {
-            const tools = (server.capabilities || []).filter(capability => capability.kind === 'tool').map(tool => tool.name);
-            return `- ${server.name}: ${server.status}${tools.length ? `; tools: ${tools.join(', ')}` : ''}`;
-        });
-        return {
-            role: 'system',
-            content: `Available MCP capability state. These tools are not automatically invoked; the user must explicitly request tool use.\n\n${lines.join('\n')}`
-        };
+        if (typeof buildMcpRuntimeContextMessage === 'function') return buildMcpRuntimeContextMessage();
+        return null;
     }
 
     function messageToApiMessage(msg) {
+        if (msg.role === 'tool_result') {
+            return { role: 'assistant', content: msg.content };
+        }
         if (msg.attachments?.length && msg.role === 'user') {
             const contentParts = [];
             for (const att of msg.attachments) {

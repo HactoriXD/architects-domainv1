@@ -104,6 +104,7 @@ function renderMessages() {
         el.messagesList.style.display = 'flex';
         el.messagesList.innerHTML = state.messages.map((msg, i) => {
             const isUser = msg.role === 'user';
+            const isTool = msg.role === 'tool_result';
             const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             let attachmentsHtml = '';
             if (msg.attachments?.length) {
@@ -113,7 +114,7 @@ function renderMessages() {
                 ).join('') + '</div>';
             }
             const statusHtml = msg.status
-                ? `<div class="message-status ${msg.status}">${msg.status === 'error' ? 'Request failed' : 'Generation stopped'}</div>`
+                ? `<div class="message-status ${msg.status}">${msg.status === 'error' ? 'Request failed' : msg.role === 'tool_result' ? `Tool ${escapeHtml(msg.status)}` : 'Generation stopped'}</div>`
                 : '';
             
             // Action buttons
@@ -144,15 +145,16 @@ function renderMessages() {
             return `<div class="message ${msg.role}" data-index="${i}">
                 <div class="message-avatar">${isUser 
                     ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+                    : isTool ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4l6 6-6 6"/><path d="M4 20v-7a3 3 0 0 1 3-3h13"/></svg>'
                     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
                 }</div>
                 <div class="message-content">
-                    <div class="message-header"><span class="message-role">${isUser ? 'You' : CONFIG.ASSISTANT_NAME}</span><span class="message-time">${time}</span></div>
+                    <div class="message-header"><span class="message-role">${isUser ? 'You' : isTool ? 'MCP Tool' : CONFIG.ASSISTANT_NAME}</span><span class="message-time">${time}</span></div>
                     ${attachmentsHtml}
                     <div class="message-body message-bubble">${formatMessageContent(msg.content)}</div>
                     ${statusHtml}
                     ${editForm}
-                    ${isUser ? userActions : assistantActions}
+                    ${isTool ? '' : isUser ? userActions : assistantActions}
                 </div>
             </div>`;
         }).join('');

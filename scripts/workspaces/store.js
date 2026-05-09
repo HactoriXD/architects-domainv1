@@ -81,10 +81,13 @@ function loadWorkspaces() {
 
 function saveWorkspaces() {
     try {
-        localStorage.setItem(CONFIG.WORKSPACES_KEY, JSON.stringify(state.workspaces));
+        const serialized = JSON.stringify(state.workspaces);
+        if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(serialized, 'Workspaces', CONFIG.WORKSPACES_KEY)) return;
+        localStorage.setItem(CONFIG.WORKSPACES_KEY, serialized);
         if (state.activeWorkspaceId) localStorage.setItem(CONFIG.ACTIVE_WORKSPACE_KEY, state.activeWorkspaceId);
     } catch (e) {
         console.error('Workspace save failed:', e);
+        showToast('Could not save workspaces locally. Export or clear data.', 'error');
     }
 }
 

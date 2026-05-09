@@ -39,6 +39,11 @@
         }
         .message-avatar svg { width: 18px; height: 18px; color: white; }
         .message.assistant .message-avatar svg { color: var(--violet-400); }
+        .message.tool_result .message-avatar {
+            background: rgba(20, 184, 166, 0.08);
+            border-color: rgba(20, 184, 166, 0.22);
+        }
+        .message.tool_result .message-avatar svg { color: #5eead4; }
         .message-content { flex: 1; min-width: 0; }
         .message-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
         .message-role { font-weight: 600; font-size: 0.875rem; }
@@ -46,6 +51,12 @@
         .message-bubble { display: inline-block; width: fit-content; max-width: 75%; height: auto; min-height: 0; padding: 10px 18px; line-height: 1.35; border-radius: 18px; background: #1f1f1f; border: 1px solid rgba(255, 255, 255, 0.08); color: inherit; overflow-wrap: break-word; font-size: 0.9375rem; }
         .message.user .message-bubble,
         .message.assistant .message-bubble { background: #1f1f1f; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .message.tool_result .message-bubble {
+            background: rgba(13, 13, 13, 0.92);
+            border: 1px solid rgba(20, 184, 166, 0.18);
+            color: rgba(255,255,255,0.78);
+            font-size: 0.875rem;
+        }
         .message-body { font-size: 15px; line-height: 1.55; color: rgba(255, 255, 255, 0.88); overflow-wrap: break-word; }
         .message-body p { margin: 0 0 0.75em; }
         .message-body p:last-child { margin-bottom: 0; }

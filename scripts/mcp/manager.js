@@ -1,17 +1,24 @@
 // MCP Manager
     // ============================================
-    function createMcpServer({ type, name, endpoint }) {
+    function createMcpServer({ type, name, endpoint, config }) {
         const preset = getMcpPreset(type);
         const now = Date.now();
         return {
             id: generateId(),
             name: String(name || preset.defaultName).trim(),
             type: preset.type,
-            endpoint: String(endpoint || '').trim(),
+            endpoint: String(endpoint || preset.defaultEndpoint || '').trim(),
+            transport: preset.transport || 'http',
+            config: config || {},
             enabled: false,
             status: 'untested',
             workspaceId: state.activeWorkspaceId,
             capabilities: [],
+            resources: [],
+            permissions: { read: 'auto', network: 'confirm', destructive: 'confirm' },
+            health: { state: 'untested', checkedAt: 0 },
+            lastSeenAt: 0,
+            executionHistory: [],
             createdAt: now,
             updatedAt: now,
             lastError: ''
@@ -20,12 +27,19 @@
 
     function addMcpServer() {
         const type = el.mcpServerType.value || 'custom';
+        let config = {};
+        try {
+            config = parseMcpConfigInput();
+        } catch (error) {
+            return;
+        }
         const server = createMcpServer({
             type,
             name: el.mcpServerName.value,
-            endpoint: el.mcpServerEndpoint.value
+            endpoint: el.mcpServerEndpoint.value,
+            config
         });
-        if (!server.endpoint) {
+        if (!server.endpoint && server.transport !== 'bridge') {
             showToast('Add a browser-reachable MCP HTTP endpoint', 'error');
             return;
         }
@@ -36,6 +50,20 @@
         updateContextInspector();
         el.mcpServerName.value = '';
         el.mcpServerEndpoint.value = '';
+        if (el.mcpServerConfig) el.mcpServerConfig.value = '';
+    }
+
+    function parseMcpConfigInput() {
+        const raw = el.mcpServerConfig?.value.trim();
+        if (!raw) return {};
+        try {
+            const config = JSON.parse(raw);
+            if (!config || typeof config !== 'object' || Array.isArray(config)) throw new Error('Config must be an object');
+            return config;
+        } catch (error) {
+            showToast('Bridge config must be valid JSON', 'error');
+            throw error;
+        }
     }
 
     function updateMcpServer(id, patch) {
@@ -61,10 +89,13 @@
         const server = updateMcpServer(id, { status: 'testing', lastError: '' });
         if (!server) return;
         try {
-            const result = await testMcpEndpoint(server.endpoint);
+            const result = await mcpRuntimeConnect(server);
             updateMcpServer(id, {
                 status: 'connected',
                 capabilities: result.capabilities,
+                resources: result.resources || [],
+                health: result.health,
+                lastSeenAt: result.lastSeenAt,
                 lastError: ''
             });
             showToast(`${server.name} connected`, 'success');
@@ -75,5 +106,24 @@
                 lastError: error.message || 'Connection failed'
             });
             showToast(`${server.name} is unreachable`, 'error');
+        }
+    }
+
+    async function refreshMcpBridgeStatus() {
+        if (!el.mcpBridgeStatus) return;
+        if (location.protocol === 'file:') {
+            el.mcpBridgeStatus.textContent = 'Bridge requires npm start';
+            el.mcpBridgeStatus.className = 'provider-status error';
+            return;
+        }
+        try {
+            await bridgeHealth({ endpoint: `${location.origin}/bridge` });
+            state.mcpBridgeHealth = { status: 'online', checkedAt: Date.now(), error: '' };
+            el.mcpBridgeStatus.textContent = 'Bridge online';
+            el.mcpBridgeStatus.className = 'provider-status connected';
+        } catch (error) {
+            state.mcpBridgeHealth = { status: 'offline', checkedAt: Date.now(), error: error.message || 'Bridge offline' };
+            el.mcpBridgeStatus.textContent = 'Bridge offline';
+            el.mcpBridgeStatus.className = 'provider-status error';
         }
     }

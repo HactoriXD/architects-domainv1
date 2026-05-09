@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { handleBridgeRequest } = require('./bridge/server');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
@@ -18,11 +19,14 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (await handleBridgeRequest(req, res, url)) {
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
-      sendJson(res, 410, { error: 'No backend API is available. Architect’s Domain is BYOAK: browser calls provider APIs directly.' });
+      sendJson(res, 410, { error: "No backend API is available. Architect's Domain is BYOAK: browser calls provider APIs directly." });
       return;
     }
     serveStatic(url.pathname, res);

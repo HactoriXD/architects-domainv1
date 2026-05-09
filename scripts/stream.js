@@ -39,23 +39,10 @@
         el.sendBtn.disabled = true;
         updateConversationNavState();
 
-        const apiMessages = buildApiMessages(state.messages.slice(0, userMsgIndex + 1));
-
         addStreamingMessage();
 
         try {
-            const requestBody = buildRequestBody(apiMessages);
-
-            const response = await fetch(`${getProvider().apiBase}/chat/completions`, {
-                method: 'POST',
-                headers: getAuthHeaders(true),
-                body: JSON.stringify(requestBody),
-                signal: state.abortController.signal
-            });
-
-            if (!response.ok) throw new Error(await parseApiError(response));
-
-            const result = await readStreamingCompletion(response);
+            const result = await runCompletionWithMcpTools(buildApiMessages(state.messages.slice(0, userMsgIndex + 1)));
             finalizeStreamingMessage(result.content, result.usage, state.activeStream);
         } catch (error) {
             handleStreamFailure(error, { removeUserMessage: false, fallback: 'Failed to regenerate' });
@@ -139,12 +126,66 @@ function finalizeStreamingMessage(content, usage = null, stream = state.activeSt
 
     // ============================================
 
+async function requestStreamingCompletion(apiMessages) {
+        const requestBody = buildRequestBody(apiMessages);
+
+        const response = await fetch(`${getProvider().apiBase}/chat/completions`, {
+            method: 'POST',
+            headers: getAuthHeaders(true),
+            body: JSON.stringify(requestBody),
+            signal: state.abortController.signal
+        });
+
+        if (!response.ok) throw new Error(await parseApiError(response));
+        return readStreamingCompletion(response);
+    }
+
+    async function runCompletionWithMcpTools(apiMessages) {
+        let workingMessages = [...apiMessages];
+        let result = await requestStreamingCompletion(workingMessages);
+        for (let round = 0; round < MCP_RUNTIME.maxToolRounds && result.toolCalls?.length; round += 1) {
+            removeStreamingElement();
+            const assistantToolMessage = buildAssistantToolCallMessage(result.content, result.toolCalls);
+            workingMessages.push(assistantToolMessage);
+            const toolExecutions = [];
+            for (const call of result.toolCalls) {
+                const execution = await executeMcpToolCall(call.name, call.arguments || {});
+                execution.providerToolCallId = call.id;
+                toolExecutions.push(execution);
+                workingMessages.push(buildToolResultApiMessage(execution));
+                appendVisibleToolResultMessage(execution);
+            }
+            syncCurrentChatMessages();
+            saveChats();
+            renderMessages();
+            addStreamingMessage();
+            result = await requestStreamingCompletion(workingMessages);
+            if (toolExecutions.some(execution => execution.status === 'cancelled')) break;
+        }
+        return result;
+    }
+
+    function appendVisibleToolResultMessage(execution) {
+        const content = execution.status === 'success'
+            ? `MCP tool completed: ${execution.serverName} / ${execution.toolName}\n\n${sanitizeMcpToolResult(execution.result).slice(0, 8000)}`
+            : `MCP tool ${execution.status}: ${execution.serverName} / ${execution.toolName}\n\n${execution.error || 'No output'}`;
+        state.messages.push({
+            role: 'tool_result',
+            content,
+            timestamp: Date.now(),
+            attachments: [],
+            mcpExecutionId: execution.id,
+            status: execution.status
+        });
+    }
+
 async function readStreamingCompletion(response) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
         let usage = null;
         let buffer = '';
+        const toolCallParts = [];
 
         while (true) {
             const { done, value } = await reader.read();
@@ -159,10 +200,18 @@ async function readStreamingCompletion(response) {
                 try {
                     const parsed = JSON.parse(data);
                     if (parsed.usage) usage = normalizeUsage(parsed.usage);
-                    const delta = parsed.choices?.[0]?.delta?.content;
+                    const deltaObject = parsed.choices?.[0]?.delta || {};
+                    const delta = deltaObject.content;
                     if (delta) {
                         fullContent += delta;
                         updateStreamingMessage(fullContent);
+                    }
+                    for (const part of extractProviderToolCallsFromChunk(deltaObject)) {
+                        const index = part.index || 0;
+                        toolCallParts[index] = toolCallParts[index] || { id: part.id || generateId(), function: { name: '', arguments: '' } };
+                        if (part.id) toolCallParts[index].id = part.id;
+                        if (part.function?.name) toolCallParts[index].function.name += part.function.name;
+                        if (part.function?.arguments) toolCallParts[index].function.arguments += part.function.arguments;
                     }
                 } catch (e) {
                     console.warn('Skipped malformed stream line:', e);
@@ -171,7 +220,7 @@ async function readStreamingCompletion(response) {
             if (done) break;
         }
 
-        return { content: fullContent, usage };
+        return { content: fullContent, usage, toolCalls: parseProviderToolCallsFromMessage({ tool_calls: toolCallParts.filter(Boolean) }) };
     }
 
     async function sendMessage() {
@@ -205,23 +254,10 @@ async function readStreamingCompletion(response) {
         updateStats();
         updateConversationNavState();
 
-        const apiMessages = buildApiMessages(state.messages);
-
         addStreamingMessage();
 
         try {
-            const requestBody = buildRequestBody(apiMessages);
-
-            const response = await fetch(`${getProvider().apiBase}/chat/completions`, {
-                method: 'POST',
-                headers: getAuthHeaders(true),
-                body: JSON.stringify(requestBody),
-                signal: state.abortController.signal
-            });
-
-            if (!response.ok) throw new Error(await parseApiError(response));
-
-            const result = await readStreamingCompletion(response);
+            const result = await runCompletionWithMcpTools(buildApiMessages(state.messages));
             finalizeStreamingMessage(result.content, result.usage, state.activeStream);
         } catch (error) {
             handleStreamFailure(error, { removeUserMessage: error.name !== 'AbortError', fallback: 'Failed to send message' });

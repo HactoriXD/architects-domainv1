@@ -4,7 +4,14 @@
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             const isImage = file.type.startsWith('image/');
-            reader.onload = (e) => resolve({ id: generateId(), name: file.name, size: file.size, type: isImage ? 'image' : 'file', mimeType: file.type, data: e.target.result });
+            reader.onload = (e) => {
+                const data = e.target.result;
+                if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(String(data || ''), file.name)) {
+                    reject(new Error('Not enough local storage headroom'));
+                    return;
+                }
+                resolve({ id: generateId(), name: file.name, size: file.size, type: isImage ? 'image' : 'file', mimeType: file.type, data });
+            };
             reader.onerror = () => reject(new Error('Failed to read file'));
             isImage ? reader.readAsDataURL(file) : reader.readAsText(file);
         });

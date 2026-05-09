@@ -5,7 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "check": "node scripts/check-js.js",
+    "test": "node scripts/bridge-test.js && node scripts/smoke-test.js"
   },
   "engines": {
     "node": ">=18"

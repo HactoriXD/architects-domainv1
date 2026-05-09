@@ -8,8 +8,10 @@
                     ...m, attachments: m.attachments?.map(a => ({ ...a, data: a.type === 'image' ? a.data : null })) || []
                 }))};
             }
-            localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(data));
-        } catch (e) { console.error('Save failed:', e); }
+            const serialized = JSON.stringify(data);
+            if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(serialized, 'Chats', CONFIG.STORAGE_KEY)) return;
+            localStorage.setItem(CONFIG.STORAGE_KEY, serialized);
+        } catch (e) { console.error('Save failed:', e); showToast('Could not save chats locally. Export or clear data.', 'error'); }
     }
 
     function loadChats() {
@@ -25,9 +27,12 @@
 
     function saveMemories() {
         try {
-            localStorage.setItem(CONFIG.MEMORIES_KEY, JSON.stringify(state.memories));
+            const serialized = JSON.stringify(state.memories);
+            if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(serialized, 'Memories', CONFIG.MEMORIES_KEY)) return;
+            localStorage.setItem(CONFIG.MEMORIES_KEY, serialized);
         } catch (e) {
             console.error('Memory save failed:', e);
+            showToast('Could not save memories locally. Export or clear data.', 'error');
         }
     }
 
@@ -63,9 +68,12 @@
 
     function saveMcpServers() {
         try {
-            localStorage.setItem(CONFIG.MCP_SERVERS_KEY, JSON.stringify(state.mcpServers));
+            const serialized = JSON.stringify(state.mcpServers);
+            if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(serialized, 'MCP servers', CONFIG.MCP_SERVERS_KEY)) return;
+            localStorage.setItem(CONFIG.MCP_SERVERS_KEY, serialized);
         } catch (e) {
             console.error('MCP server save failed:', e);
+            showToast('Could not save MCP servers locally. Export or clear data.', 'error');
         }
     }
 
@@ -86,10 +94,17 @@
             name: String(server.name || 'MCP Server').trim(),
             type: server.type || 'custom',
             endpoint: String(server.endpoint || '').trim(),
+            transport: server.transport || (['filesystem', 'markdown-vault', 'github', 'web-fetch'].includes(server.type) ? 'bridge' : 'http'),
+            config: server.config && typeof server.config === 'object' ? server.config : {},
             workspaceId: server.workspaceId || state.activeWorkspaceId || '',
             enabled: Boolean(server.enabled),
             status: server.status || 'untested',
             capabilities: Array.isArray(server.capabilities) ? server.capabilities : [],
+            resources: Array.isArray(server.resources) ? server.resources : [],
+            permissions: server.permissions || { read: 'auto', network: 'confirm', destructive: 'confirm' },
+            health: server.health || { state: server.status || 'untested', checkedAt: 0 },
+            lastSeenAt: server.lastSeenAt || 0,
+            executionHistory: Array.isArray(server.executionHistory) ? server.executionHistory.slice(0, 20) : [],
             createdAt: server.createdAt || Date.now(),
             updatedAt: server.updatedAt || server.createdAt || Date.now(),
             lastError: server.lastError || ''
@@ -108,7 +123,7 @@
     }
 
     function saveSettings() {
-        try { localStorage.setItem(CONFIG.SETTINGS_KEY, JSON.stringify({
+        try { const serialized = JSON.stringify({
             provider: state.provider,
             apiKeys: state.apiKeys,
             selectedModelId: state.selectedModel?.id,
@@ -117,8 +132,10 @@
             providerSettings: state.providerSettings,
             providerStatus: state.providerStatus,
             settings: state.settings
-        })); }
-        catch (e) {}
+        });
+        if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(serialized, 'Settings', CONFIG.SETTINGS_KEY)) return;
+        localStorage.setItem(CONFIG.SETTINGS_KEY, serialized); }
+        catch (e) { showToast('Could not save settings locally. Export or clear data.', 'error'); }
     }
 
     function loadSettings() {

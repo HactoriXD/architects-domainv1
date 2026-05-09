@@ -2,7 +2,7 @@
 
 **Architect's Domain** is a local-first, multi-provider AI workstation for people who want more control than a standard chatbot gives them.
 
-It combines streaming chat, bring-your-own API keys, persistent user-approved memory, image previews, MCP server foundations, and visible context inspection inside a restrained dark workstation interface.
+It combines streaming chat, bring-your-own API keys, persistent user-approved memory, image previews, real MCP tool execution through an optional local bridge, and visible context inspection inside a restrained dark workstation interface.
 
 > Local-first means chats, settings, keys, memories, and context assembly stay in the browser. Model inference still uses external providers such as OpenRouter, DeepSeek, or Venice through your own API keys.
 
@@ -54,11 +54,23 @@ The project is designed as a personal AI cockpit rather than a generic chatbot c
   - No silent memory saves
   - No hidden tool execution
 
+- **Workspaces**
+  - Workspace switcher and manager
+  - Workspace-scoped chats, memories, MCP configs, notes, lorebooks, and imported text files
+  - Workspace export/import for portable local project context
+
+- **Data Manager**
+  - First-run local-first privacy notice
+  - Storage usage meter
+  - Export/import full local backups
+  - Clear chats, memories, API keys, or reset all local app data
+  - Storage warnings for oversized local files and images
+
 - **MCP foundation**
-  - Browser HTTP/SSE MCP server configuration
-  - Add, remove, enable, disable, and test server connections
-  - Capability listing for configured servers
-  - Designed for user-driven tool access, not autonomous workflows
+  - Browser HTTP/SSE MCP server support
+  - Optional local Node bridge for practical filesystem, markdown vault, GitHub, and web fetch tools
+  - Tool discovery, execution cards, status badges, resources, and context inspector visibility
+  - Read-only tools can run visibly; destructive or mutating tools require approval
 
 - **Image handling**
   - Image attachments in chat
@@ -88,6 +100,7 @@ Stored locally:
 - settings
 - pinned context
 - MCP server configuration
+- workspaces, lorebooks, and imported text files
 
 Sent externally only when you choose to chat:
 
@@ -97,6 +110,24 @@ Sent externally only when you choose to chat:
 - attached files/images included in that message
 
 The app is transparent by design: the Context Sources inspector shows what durable context is entering the model.
+
+Use **Data Manager** before sharing a machine, publishing screenshots, or switching browsers. Full local backups can include API keys, so store exported backup files privately.
+
+## MCP Runtime
+
+MCP works in two modes:
+
+- Direct `index.html` mode keeps chat, memory, settings, and custom browser-reachable HTTP/SSE MCP configuration available, but local bridge execution is disabled.
+- `npm start` mode enables the built-in bridge at `/bridge`, which can safely expose approved local tools to the browser.
+
+Built-in bridge presets:
+
+- Filesystem: list, read, and search text-like files inside one configured root folder.
+- Markdown Vault: the same local folder engine tuned for notes and vaults.
+- GitHub: read repository metadata, files, issues, and commits through the GitHub API, with an optional local token.
+- Web Fetch: fetch public HTTP/HTTPS pages through the local bridge.
+
+MCP tool calls are visible in the interface. Tool results are injected into the current model turn and shown as tool cards in the chat. Failed MCP calls degrade gracefully and should not break normal chat.
 
 ## Tech Stack
 
@@ -112,8 +143,10 @@ No React, Vue, Tailwind, bundler, Electron, or framework rewrite.
 
 ```text
 assets/
+bridge/
 scripts/
   mcp/
+  workspaces/
 styles/
 index.html
 server.js
@@ -123,6 +156,8 @@ README.md
 
 ## Run Locally
 
+Architect's Domain can be opened directly by double-clicking `index.html`. For the most consistent local behavior, use the tiny static server:
+
 ```bash
 npm start
 ```
@@ -131,6 +166,13 @@ Then open:
 
 ```text
 http://localhost:3000
+```
+
+Run checks before publishing changes:
+
+```bash
+npm run check
+npm test
 ```
 
 ## Configuration
@@ -160,6 +202,16 @@ It can be hosted on:
 - Any static web server
 
 Provider calls are made from the browser, so CORS support depends on the selected provider.
+
+## Publishing Checklist
+
+Before uploading screenshots, videos, or demo data:
+
+- Clear or hide private chats and memory notes.
+- Do not show provider API keys or account pages.
+- Review imported files and workspace notes.
+- Use Data Manager to export a private backup before clearing local data.
+- Confirm `.env` is not committed. Only `.env.example` should be public.
 
 ## Status
 

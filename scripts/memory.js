@@ -308,8 +308,16 @@
             sources.push({
                 type: 'MCP',
                 label: server.name,
-                detail: tools.length ? tools.map(tool => tool.name).join(', ') : server.status,
-                active: server.status === 'connected'
+                detail: tools.length ? `${tools.length} tools · ${server.status}` : server.status,
+                active: ['connected', 'degraded'].includes(server.status)
+            });
+        }
+        for (const execution of (state.mcpExecutions || []).slice(0, 5)) {
+            sources.push({
+                type: 'Tool',
+                label: execution.toolName,
+                detail: `${execution.status}${execution.elapsedMs ? ` · ${execution.elapsedMs}ms` : ''}`,
+                active: execution.status === 'success'
             });
         }
         if (pinnedNotes) sources.push({ type: 'Pinned', label: 'Pinned chat context', detail: `${pinnedNotes.length} chars`, active: true });

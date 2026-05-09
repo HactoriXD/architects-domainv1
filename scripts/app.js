@@ -29,6 +29,7 @@
         initWorkspacesUi();
         initMemory();
         initMcpUi();
+        initDataManager();
         applyWorkspaceState(getActiveWorkspace());
         await fetchModels();
         

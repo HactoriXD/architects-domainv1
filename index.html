@@ -140,12 +140,19 @@
                             </div>
                             <div class="settings-hint">Optional encrypted backup for local provider keys and generation settings.</div>
                         </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Local Data</span><span class="settings-value" id="storageUsageValue">Calculating</span></div>
+                            <div class="provider-actions">
+                                <button class="btn" id="dataManagerBtn" type="button">Open Data Manager</button>
+                            </div>
+                            <div class="settings-hint">Export, import, reset, or clear browser-local chats, memories, workspaces, MCP servers, and keys.</div>
+                        </div>
                         <div class="settings-divider"></div>
                         <h3 class="settings-title">MCP Servers</h3>
                         <div class="settings-group">
                             <div class="settings-label"><span>Server Type</span></div>
                             <select class="settings-select" id="mcpServerType"></select>
-                            <div class="settings-hint">Browser HTTP/SSE endpoints only. Stdio presets require an external bridge URL.</div>
+                            <div class="settings-hint">Built-in presets use the local bridge from npm start. Custom endpoints can use browser HTTP/SSE MCP.</div>
                         </div>
                         <div class="settings-group">
                             <div class="settings-label"><span>Server Name</span></div>
@@ -158,7 +165,13 @@
                                 <button class="btn" id="mcpAddServerBtn" type="button">Add Server</button>
                             </div>
                         </div>
+                        <div class="settings-group">
+                            <div class="settings-label"><span>Bridge Config JSON</span><span class="provider-status" id="mcpBridgeStatus">Bridge unknown</span></div>
+                            <textarea class="settings-input mcp-config-input" id="mcpServerConfig" rows="5" spellcheck="false" placeholder='{"root":"C:\\Users\\USER\\Desktop\\architects-domain"}'></textarea>
+                            <div class="settings-hint">Filesystem/vault use root. GitHub uses owner, repo, and optional token. This stays local to your browser.</div>
+                        </div>
                         <div class="mcp-server-list" id="mcpServerList"></div>
+                        <div class="mcp-execution-list" id="mcpExecutionList"></div>
                         <div class="settings-divider"></div>
                         <h3 class="settings-title">Generation Settings</h3>
                         <div class="settings-group">
@@ -472,14 +485,93 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="privacyModal">
+        <div class="modal privacy-modal">
+            <div class="modal-kicker">Local-first public beta</div>
+            <h3 class="modal-title">Your data stays in this browser until you send a message.</h3>
+            <div class="privacy-grid">
+                <div class="privacy-card">
+                    <strong>Stored locally</strong>
+                    <p>Chats, memories, workspaces, MCP server configs, settings, and API keys use browser localStorage on this device.</p>
+                </div>
+                <div class="privacy-card">
+                    <strong>Sent to providers</strong>
+                    <p>Only the active message context, enabled memories/context, attachments, and your API key are sent directly to the selected provider.</p>
+                </div>
+                <div class="privacy-card">
+                    <strong>You stay in control</strong>
+                    <p>Use Data Manager to export a backup, clear keys, remove chats or memories, and reset all local app data.</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="privacyOpenDataBtn" type="button">Open Data Manager</button>
+                <button class="btn btn-primary" id="privacyAcceptBtn" type="button">I understand</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="dataManagerModal">
+        <div class="modal data-manager-modal">
+            <div class="data-manager-header">
+                <div>
+                    <div class="modal-kicker">Local browser storage</div>
+                    <h3 class="modal-title">Data Manager</h3>
+                    <p class="workspace-modal-subtitle">Back up or clear local data before publishing screenshots, sharing a machine, or switching browsers.</p>
+                </div>
+                <button class="workspace-close-btn" id="dataManagerCloseBtn" type="button" aria-label="Close Data Manager">&times;</button>
+            </div>
+            <div class="storage-meter">
+                <div class="storage-meter-top">
+                    <span id="dataStorageUsage">Calculating storage...</span>
+                    <span id="dataStoragePercent"></span>
+                </div>
+                <div class="storage-meter-track"><span id="dataStorageBar"></span></div>
+                <div class="settings-hint" id="dataStorageHint">Browser quota varies by browser and disk space.</div>
+            </div>
+            <div class="data-manager-grid">
+                <section class="data-manager-card">
+                    <h4>Backup</h4>
+                    <p>Export all local Architect's Domain data, including API keys. Store this file privately.</p>
+                    <button class="btn btn-primary" id="exportAllDataBtn" type="button">Export All Local Data</button>
+                    <button class="btn" id="importAllDataBtn" type="button">Import Full Backup</button>
+                    <input type="file" id="dataImportInput" accept="application/json,.json" hidden>
+                </section>
+                <section class="data-manager-card danger-zone">
+                    <h4>Clear Data</h4>
+                    <p>These actions affect only this browser on this device. They cannot be undone without a backup.</p>
+                    <div class="data-manager-actions">
+                        <button class="btn" id="clearChatsBtn" type="button">Clear Chats</button>
+                        <button class="btn" id="clearMemoriesBtn" type="button">Clear Memories</button>
+                        <button class="btn" id="clearApiKeysDataBtn" type="button">Clear API Keys</button>
+                        <button class="btn danger" id="fullResetBtn" type="button">Full Local Reset</button>
+                    </div>
+                </section>
+            </div>
+            <div class="privacy-checklist">
+                <strong>Before publishing screenshots or videos</strong>
+                <span>Hide private chats, memories, API keys, imported files, and any provider account identifiers.</span>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="scripts/state.js" defer></script>
     <script src="scripts/storage.js" defer></script>
+    <script src="scripts/data-manager.js" defer></script>
     <script src="scripts/workspaces/store.js" defer></script>
     <script src="scripts/workspaces/router.js" defer></script>
     <script src="scripts/workspaces/ui.js" defer></script>
     <script src="scripts/mcp/registry.js" defer></script>
+    <script src="scripts/mcp/transport-sse.js" defer></script>
+    <script src="scripts/mcp/transport-http.js" defer></script>
+    <script src="scripts/mcp/bridge-client.js" defer></script>
+    <script src="scripts/mcp/capability-resolver.js" defer></script>
+    <script src="scripts/mcp/runtime.js" defer></script>
+    <script src="scripts/mcp/permissions.js" defer></script>
+    <script src="scripts/mcp/tool-executor.js" defer></script>
+    <script src="scripts/mcp/tool-router.js" defer></script>
+    <script src="scripts/mcp/prompt-injection.js" defer></script>
     <script src="scripts/mcp/client.js" defer></script>
     <script src="scripts/mcp/manager.js" defer></script>
     <script src="scripts/mcp/ui.js" defer></script>

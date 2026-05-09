@@ -189,6 +189,7 @@ async function importWorkspaceFiles(files) {
             continue;
         }
         const content = await file.text();
+        if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(content, file.name)) continue;
         workspace.importedFiles.unshift(normalizeImportedFile({ name: file.name, extension, size: file.size, content }));
     }
     touchWorkspace(workspace.id);
