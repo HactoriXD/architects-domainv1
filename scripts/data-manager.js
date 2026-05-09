@@ -17,7 +17,8 @@ function getManagedStorageKeys() {
         CONFIG.WORKSPACES_KEY,
         CONFIG.ACTIVE_WORKSPACE_KEY,
         PRIVACY_NOTICE_KEY,
-        'architects_domain_welcomed'
+        'architects_domain_welcomed',
+        'idb_migrated'
     ];
 }
 
@@ -86,22 +87,70 @@ function hasStorageHeadroom(extraText = '', label = 'This data', replaceKey = ''
     return true;
 }
 
-function updateDataStorageUi() {
-    const info = getStorageQuotaInfo();
-    const percent = Math.min(100, Math.round(info.ratio * 100));
-    const label = `${formatFileSize(info.usage)} used`;
-    if (el.storageUsageValue) el.storageUsageValue.textContent = label;
-    if (el.dataStorageUsage) el.dataStorageUsage.textContent = `${label} of ~${formatFileSize(info.quota)} practical localStorage budget`;
-    if (el.dataStoragePercent) el.dataStoragePercent.textContent = `${percent}%`;
+async function updateDataStorageUi() {
+    const lsInfo = getStorageQuotaInfo();
+    const lsPercent = Math.min(100, Math.round(lsInfo.ratio * 100));
+    const lsLabel = `${formatFileSize(lsInfo.usage)} used`;
+
+    // IndexedDB usage
+    let idbBytes = 0;
+    let idbPercent = 0;
+    let idbLabel = 'calculating...';
+    try {
+        idbBytes = typeof estimateIDBStorageUsageBytes === 'function' ? await estimateIDBStorageUsageBytes() : 0;
+        idbLabel = `${formatFileSize(idbBytes)} used`;
+        const idbQuota = typeof getIDBStorageQuota === 'function' ? await getIDBStorageQuota() : (200 * 1024 * 1024);
+        idbPercent = Math.min(100, idbQuota > 0 ? Math.round((idbBytes / idbQuota) * 100) : 0);
+    } catch (e) { idbLabel = 'unknown'; }
+
+    // localStorage bar (Settings Storage)
+    if (el.dataStorageUsage) el.dataStorageUsage.textContent = `Settings Storage: ${lsLabel} of ~${formatFileSize(lsInfo.quota)}`;
+    if (el.dataStoragePercent) el.dataStoragePercent.textContent = `${lsPercent}%`;
     if (el.dataStorageBar) {
-        el.dataStorageBar.style.width = `${Math.min(100, percent)}%`;
-        el.dataStorageBar.dataset.level = info.ratio >= STORAGE_DANGER_RATIO ? 'danger' : info.ratio >= STORAGE_WARNING_RATIO ? 'warning' : 'ok';
+        el.dataStorageBar.style.width = `${Math.min(100, lsPercent)}%`;
+        el.dataStorageBar.dataset.level = lsInfo.ratio >= STORAGE_DANGER_RATIO ? 'danger' : lsInfo.ratio >= STORAGE_WARNING_RATIO ? 'warning' : 'ok';
     }
+    // IndexedDB bar (Chat Storage)
+    if (el.idbStorageUsage) el.idbStorageUsage.textContent = `Chat Storage (IndexedDB): ${idbLabel}`;
+    if (el.idbStoragePercent) el.idbStoragePercent.textContent = `${idbPercent}%`;
+    if (el.idbStorageBar) {
+        el.idbStorageBar.style.width = `${Math.min(100, idbPercent)}%`;
+        el.idbStorageBar.dataset.level = 'ok';
+    }
+    if (el.storageUsageValue) el.storageUsageValue.textContent = lsLabel;
     if (el.dataStorageHint) {
-        el.dataStorageHint.textContent = info.ratio >= STORAGE_WARNING_RATIO
-            ? 'Storage is high. Large images, imported files, and long chats can fill localStorage quickly.'
-            : 'Browser quota varies by browser and disk space. Export backups before clearing data.';
+        el.dataStorageHint.textContent = lsInfo.ratio >= STORAGE_WARNING_RATIO
+            ? 'Storage is high. Chats are stored in IndexedDB; settings and keys in localStorage.'
+            : 'Chats, workspaces, memories, and MCP servers are stored in IndexedDB. Settings and API keys remain in localStorage.';
     }
+
+    // Storage Details
+    await updateStorageDetails();
+}
+
+async function updateStorageDetails() {
+    if (!el.storageDetailChats) return;
+    try {
+        const stats = await db.getStats();
+        el.storageDetailChats.textContent = stats.chatCount;
+        el.storageDetailMessages.textContent = stats.totalMessages;
+        el.storageDetailOldest.textContent = stats.oldestChatDate;
+        el.storageDetailLargest.textContent = stats.largestChat;
+    } catch (e) {
+        el.storageDetailChats.textContent = '-';
+        el.storageDetailMessages.textContent = '-';
+        el.storageDetailOldest.textContent = '-';
+        el.storageDetailLargest.textContent = '-';
+    }
+}
+
+function toggleStorageDetails() {
+    const body = el.storageDetailsBody;
+    const toggle = el.storageDetailsToggle;
+    const open = !body.hidden;
+    body.hidden = open;
+    if (open) toggle.classList.remove('open');
+    else toggle.classList.add('open');
 }
 
 function openDataManager() {
@@ -145,6 +194,8 @@ async function importAllLocalData(file) {
         Object.entries(payload.storage).forEach(([key, value]) => {
             if (getManagedStorageKeys().includes(key)) localStorage.setItem(key, String(value));
         });
+        // Clear IDB and re-run migration
+        localStorage.removeItem('idb_migrated');
         showToast('Local data imported. Reloading...', 'success');
         setTimeout(() => location.reload(), 600);
     } catch (error) {
@@ -153,21 +204,39 @@ async function importAllLocalData(file) {
     }
 }
 
-function clearLocalDataGroup(group) {
+async function clearLocalDataGroup(group) {
     const labels = {
-        chats: 'all chats',
-        memories: 'all memories',
+        chats: 'all chats and messages',
+        memories: 'all memories and MCP memory data',
         apiKeys: 'all local API keys'
     };
     if (!confirm(`Clear ${labels[group]} from this browser?`)) return;
     if (group === 'chats') {
         state.chats = {};
-        saveChats();
+        try {
+            const dbInst = await db.open();
+            const tx = dbInst.transaction(['chats', 'messages', 'contexts'], 'readwrite');
+            tx.objectStore('chats').clear();
+            tx.objectStore('messages').clear();
+            tx.objectStore('contexts').clear();
+            await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
+        } catch (e) { /* IDB unavailable */ }
         createNewChat();
     }
     if (group === 'memories') {
         state.memories = [];
+        try {
+            const dbInst = await db.open();
+            const tx = dbInst.transaction(['memories', 'contexts'], 'readwrite');
+            tx.objectStore('memories').clear();
+            tx.objectStore('contexts').clear();
+            await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
+        } catch (e) {}
         saveMemories();
+        // Also clear server-side mcp-memory.json via bridge
+        try {
+            await mcpSystemRequest('/system/reset', { method: 'POST', body: {} });
+        } catch (e) { /* bridge offline */ }
         renderMemoryManager();
         updateContextInspector();
     }
@@ -183,9 +252,30 @@ function clearLocalDataGroup(group) {
     showToast(`${labels[group]} cleared`, 'success');
 }
 
-function fullLocalReset() {
-    if (!confirm('Full local reset removes chats, memories, workspaces, MCP servers, settings, and API keys from this browser. Continue?')) return;
+async function fullLocalReset() {
+    if (!confirm('Full local reset removes all chats, memories, workspaces, MCP servers, settings, and API keys. This includes bridge data on the server. Continue?')) return;
+    // Clear server-side data first
+    try {
+        await mcpSystemRequest('/system/reset', { method: 'POST', body: {} });
+    } catch (e) { /* bridge offline — clear local anyway */ }
+    // Clear localStorage
     getManagedStorageKeys().forEach(key => localStorage.removeItem(key));
+    // Clear all IndexedDB stores
+    try {
+        const dbInst = await db.open();
+        const stores = ['chats', 'messages', 'contexts', 'workspaces', 'memories', 'mcpServers', 'mcpLogs', 'mcpChatState'].filter(name => dbInst.objectStoreNames.contains(name));
+        const tx = dbInst.transaction(stores, 'readwrite');
+        tx.objectStore('chats').clear();
+        tx.objectStore('messages').clear();
+        tx.objectStore('contexts').clear();
+        tx.objectStore('workspaces').clear();
+        tx.objectStore('memories').clear();
+        if (stores.includes('mcpServers')) tx.objectStore('mcpServers').clear();
+        if (stores.includes('mcpLogs')) tx.objectStore('mcpLogs').clear();
+        if (stores.includes('mcpChatState')) tx.objectStore('mcpChatState').clear();
+        await new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = reject; });
+    } catch (e) { /* IDB may not be available */ }
+    localStorage.removeItem('idb_migrated');
     showToast('Local data reset. Reloading...', 'success');
     setTimeout(() => location.reload(), 600);
 }
@@ -212,6 +302,10 @@ function initDataManager() {
     el.clearMemoriesBtn.addEventListener('click', () => clearLocalDataGroup('memories'));
     el.clearApiKeysDataBtn.addEventListener('click', () => clearLocalDataGroup('apiKeys'));
     el.fullResetBtn.addEventListener('click', fullLocalReset);
+    // Storage details toggle
+    if (el.storageDetailsToggle) {
+        el.storageDetailsToggle.addEventListener('click', toggleStorageDetails);
+    }
     updateDataStorageUi();
     setTimeout(showPrivacyNoticeIfNeeded, 350);
 }

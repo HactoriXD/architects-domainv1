@@ -67,11 +67,12 @@ function normalizeImportedFile(file) {
     };
 }
 
-function loadWorkspaces() {
+async function loadWorkspaces() {
     try {
-        const saved = localStorage.getItem(CONFIG.WORKSPACES_KEY);
-        const parsed = saved ? JSON.parse(saved) : null;
-        state.workspaces = parsed && typeof parsed === 'object' ? parsed : {};
+        const loaded = await db.workspaces.list();
+        const parsed = {};
+        for (const ws of loaded) { parsed[ws.id] = ws; }
+        state.workspaces = loaded.length ? parsed : {};
     } catch (e) {
         state.workspaces = {};
     }
@@ -79,11 +80,9 @@ function loadWorkspaces() {
     migrateLegacyIntoWorkspaces();
 }
 
-function saveWorkspaces() {
+async function saveWorkspaces() {
     try {
-        const serialized = JSON.stringify(state.workspaces);
-        if (typeof hasStorageHeadroom === 'function' && !hasStorageHeadroom(serialized, 'Workspaces', CONFIG.WORKSPACES_KEY)) return;
-        localStorage.setItem(CONFIG.WORKSPACES_KEY, serialized);
+        await db.workspaces.saveAll(state.workspaces);
         if (state.activeWorkspaceId) localStorage.setItem(CONFIG.ACTIVE_WORKSPACE_KEY, state.activeWorkspaceId);
     } catch (e) {
         console.error('Workspace save failed:', e);

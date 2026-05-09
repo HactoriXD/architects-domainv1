@@ -33,17 +33,28 @@
         if (!streamChatId) return;
         state.isStreaming = true;
         state.followStream = isNearMessageBottom(120);
-        state.activeStream = { chatId: streamChatId, content: '', startedAt: Date.now(), mode: 'regenerate' };
+        state.activeStream = {
+            chatId: streamChatId,
+            content: '',
+            reasoning: '',
+            thinkingRequested: getDeepSeekThinkingEnabled(),
+            thinkingProvider: state.provider,
+            thinkingModel: state.selectedModel?.id || null,
+            startedAt: Date.now(),
+            mode: 'regenerate'
+        };
         state.abortController = new AbortController();
         el.stopBtn.classList.add('visible');
         el.sendBtn.disabled = true;
+        updateDeepSeekThinkingUI();
         updateConversationNavState();
 
         addStreamingMessage();
 
         try {
+            await refreshMcpMemoryContext(state.messages[userMsgIndex]?.content || '');
             const result = await runCompletionWithMcpTools(buildApiMessages(state.messages.slice(0, userMsgIndex + 1)));
-            finalizeStreamingMessage(result.content, result.usage, state.activeStream);
+            finalizeStreamingMessage(result.content, result.usage, state.activeStream, result.reasoning);
         } catch (error) {
             handleStreamFailure(error, { removeUserMessage: false, fallback: 'Failed to regenerate' });
         } finally {
@@ -53,16 +64,24 @@
             el.stopBtn.classList.remove('visible');
             updateStats();
             updateSendButton();
+            updateDeepSeekThinkingUI();
             updateConversationNavState();
         }
     }
 
-function finalizeStreamingMessage(content, usage = null, stream = state.activeStream) {
+function finalizeStreamingMessage(content, usage = null, stream = state.activeStream, reasoning = null) {
         if (!stream?.chatId) return;
         const chat = state.chats[stream.chatId];
         if (!chat) return;
         if (stream.chatId === state.currentChatId) removeStreamingElement();
+        const reasoningText = String(reasoning ?? stream.reasoning ?? '').trim();
         const assistantMessage = { role: 'assistant', content, timestamp: Date.now(), attachments: [], usage };
+        if (reasoningText) assistantMessage.reasoning = reasoningText;
+        if (stream.thinkingRequested) {
+            assistantMessage.reasoningRequested = true;
+            assistantMessage.reasoningProvider = stream.thinkingProvider || state.provider;
+            assistantMessage.reasoningModel = stream.thinkingModel || state.selectedModel?.id || null;
+        }
         if (stream.chatId === state.currentChatId) {
             if (usage) state.lastUsage = usage;
             state.messages.push(assistantMessage);
@@ -93,7 +112,14 @@ function finalizeStreamingMessage(content, usage = null, stream = state.activeSt
         if (isAbort) {
             showToast('Generation stopped', 'info');
             if (chat && stream?.content) {
+                const reasoningText = String(stream.reasoning || '').trim();
                 const stoppedMessage = { role: 'assistant', content: stream.content, timestamp: Date.now(), attachments: [], usage: null, status: 'stopped' };
+                if (reasoningText) stoppedMessage.reasoning = reasoningText;
+                if (stream.thinkingRequested) {
+                    stoppedMessage.reasoningRequested = true;
+                    stoppedMessage.reasoningProvider = stream.thinkingProvider || state.provider;
+                    stoppedMessage.reasoningModel = stream.thinkingModel || state.selectedModel?.id || null;
+                }
                 if (stream.chatId === state.currentChatId) {
                     state.messages.push(stoppedMessage);
                     chat.messages = [...state.messages];
@@ -126,8 +152,23 @@ function finalizeStreamingMessage(content, usage = null, stream = state.activeSt
 
     // ============================================
 
-async function requestStreamingCompletion(apiMessages) {
-        const requestBody = buildRequestBody(apiMessages);
+async function requestStreamingCompletion(apiMessages, options = {}) {
+        if (options.includeMcpTools !== false && location.protocol !== 'file:' && typeof getMcpSystemTools === 'function') {
+            try {
+                const resp = await getMcpSystemTools();
+                if (resp?.tools) {
+                    const servers = getWorkspaceMcpServers();
+                    for (const server of servers) {
+                        server.capabilities = (resp.tools || [])
+                            .filter(t => t.server === server.type)
+                            .map(t => typeof normalizeMcpTool === 'function'
+                                ? normalizeMcpTool(server, { ...t, inputSchema: t.inputSchema || { type: 'object', properties: t.parameters || {} } })
+                                : t);
+                    }
+                }
+            } catch (e) { /* bridge offline — use cached tools */ }
+        }
+        const requestBody = buildRequestBody(apiMessages, options);
 
         const response = await fetch(`${getProvider().apiBase}/chat/completions`, {
             method: 'POST',
@@ -142,7 +183,28 @@ async function requestStreamingCompletion(apiMessages) {
 
     async function runCompletionWithMcpTools(apiMessages) {
         let workingMessages = [...apiMessages];
-        let result = await requestStreamingCompletion(workingMessages);
+        const mcpDisabled = state.mcpControl?.toolCallingMode === 'disabled';
+        const inferredCalls = mcpDisabled ? [] : inferMcpToolCallsFromMessages(workingMessages);
+        let usedFallbackTool = false;
+        if (inferredCalls.length) {
+            removeStreamingElement();
+            for (const call of inferredCalls) {
+                const execution = await executeMcpToolCall(call.name, call.arguments || {});
+                appendVisibleToolResultMessage(execution);
+                workingMessages.push(buildMcpFallbackResultMessage(execution));
+                usedFallbackTool = true;
+            }
+            syncCurrentChatMessages();
+            saveChats();
+            renderMessages();
+            addStreamingMessage();
+        }
+        let result = await requestStreamingCompletion(workingMessages, { includeMcpTools: !usedFallbackTool && !mcpDisabled });
+        if (!result.toolCalls?.length) {
+            result.toolCalls = parseFallbackMcpToolCall(result.content);
+            if (result.toolCalls.length) updateStreamingMessage('Using MCP tool...');
+            else appendMcpParserErrors();
+        }
         for (let round = 0; round < MCP_RUNTIME.maxToolRounds && result.toolCalls?.length; round += 1) {
             removeStreamingElement();
             const assistantToolMessage = buildAssistantToolCallMessage(result.content, result.toolCalls);
@@ -159,30 +221,208 @@ async function requestStreamingCompletion(apiMessages) {
             saveChats();
             renderMessages();
             addStreamingMessage();
-            result = await requestStreamingCompletion(workingMessages);
+            result = await requestStreamingCompletion(workingMessages, { includeMcpTools: false });
+            if (!result.toolCalls?.length) {
+                result.toolCalls = parseFallbackMcpToolCall(result.content);
+                if (result.toolCalls.length) updateStreamingMessage('Using MCP tool...');
+                else appendMcpParserErrors();
+            }
             if (toolExecutions.some(execution => execution.status === 'cancelled')) break;
         }
         return result;
     }
 
+    function appendMcpParserErrors() {
+        const errors = state.mcpControl?.parserErrors || [];
+        if (!errors.length) return;
+        for (const error of errors.splice(0, 3)) {
+            state.messages.push({
+                role: 'tool_result',
+                content: `MCP tool request blocked: ${error.message}`,
+                timestamp: Date.now(),
+                attachments: [],
+                status: 'failed',
+                toolName: error.code || 'mcp_parser',
+                serverName: 'MCP Parser',
+                toolArgs: error.details || {},
+                toolPreview: error.message,
+                toolImages: [],
+                toolRawOutput: JSON.stringify(error, null, 2)
+            });
+        }
+    }
+
     function appendVisibleToolResultMessage(execution) {
-        const content = execution.status === 'success'
-            ? `MCP tool completed: ${execution.serverName} / ${execution.toolName}\n\n${sanitizeMcpToolResult(execution.result).slice(0, 8000)}`
-            : `MCP tool ${execution.status}: ${execution.serverName} / ${execution.toolName}\n\n${execution.error || 'No output'}`;
+        const toolImages = execution.status === 'success'
+            ? extractMcpToolImages(execution.result).slice(0, 4)
+            : [];
         state.messages.push({
             role: 'tool_result',
-            content,
+            content: summarizeMcpVisibleResult(execution),
             timestamp: Date.now(),
             attachments: [],
             mcpExecutionId: execution.id,
-            status: execution.status
+            status: execution.status,
+            toolName: execution.toolName,
+            serverName: execution.serverName,
+            toolArgs: execution.args || {},
+            toolPreview: summarizeMcpVisibleResult(execution),
+            toolImages,
+            toolRawOutput: execution.status === 'success'
+                ? sanitizeMcpToolResult(redactMcpToolImages(execution.result)).slice(0, 20000)
+                : execution.error || 'No output'
         });
+    }
+
+    function extractMcpToolImages(value, images = []) {
+        if (images.length >= 8 || value == null) return images;
+        if (typeof value === 'string') {
+            const image = normalizeMcpImageData(value);
+            if (image) images.push(image);
+            return images;
+        }
+        if (Array.isArray(value)) {
+            for (const item of value) extractMcpToolImages(item, images);
+            return images;
+        }
+        if (typeof value === 'object') {
+            for (const [key, item] of Object.entries(value)) {
+                if (typeof item === 'string') {
+                    const image = normalizeMcpImageData(item, key);
+                    if (image) images.push(image);
+                } else {
+                    extractMcpToolImages(item, images);
+                }
+                if (images.length >= 8) break;
+            }
+        }
+        return images;
+    }
+
+    function normalizeMcpImageData(value, key = '') {
+        const text = String(value || '').trim();
+        const hint = String(key || '').toLowerCase();
+        const dataUrlMatch = text.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)$/i);
+        if (dataUrlMatch) {
+            const mime = dataUrlMatch[1].toLowerCase() === 'jpg' ? 'jpeg' : dataUrlMatch[1].toLowerCase();
+            return { mimeType: `image/${mime}`, src: `data:image/${mime};base64,${dataUrlMatch[2].replace(/\s+/g, '')}` };
+        }
+        const compact = text.replace(/\s+/g, '');
+        const keySuggestsImage = /screenshot|image|png|jpeg|jpg|base64|data/.test(hint);
+        const looksLikePng = compact.startsWith('iVBOR') && compact.length > 80;
+        const looksLikeJpeg = compact.startsWith('/9j/') && compact.length > 80;
+        if (keySuggestsImage && looksLikePng) return { mimeType: 'image/png', src: `data:image/png;base64,${compact}` };
+        if (keySuggestsImage && looksLikeJpeg) return { mimeType: 'image/jpeg', src: `data:image/jpeg;base64,${compact}` };
+        if (looksLikePng) return { mimeType: 'image/png', src: `data:image/png;base64,${compact}` };
+        return null;
+    }
+
+    function redactMcpToolImages(value) {
+        if (value == null) return value;
+        if (typeof value === 'string') return normalizeMcpImageData(value) ? `[base64 image ${value.length} chars]` : value;
+        if (Array.isArray(value)) return value.map(redactMcpToolImages);
+        if (typeof value === 'object') {
+            const redacted = {};
+            for (const [key, item] of Object.entries(value)) {
+                if (typeof item === 'string' && normalizeMcpImageData(item, key)) {
+                    redacted[key] = `[base64 image ${item.length} chars]`;
+                } else {
+                    redacted[key] = redactMcpToolImages(item);
+                }
+            }
+            return redacted;
+        }
+        return value;
+    }
+
+    function summarizeMcpVisibleResult(execution) {
+        if (execution.status !== 'success') {
+            return `${execution.serverName} / ${execution.toolName} failed: ${execution.error || 'No output'}`;
+        }
+        const result = execution.result || {};
+        if (result.repo && result.path) {
+            return `${execution.serverName} read ${result.repo}/${result.path} (${formatFileSize(result.size || 0)}).`;
+        }
+        if (result.fullName) {
+            return `${execution.serverName} loaded ${result.fullName}: ${result.description || 'repository metadata'}.`;
+        }
+        if (Array.isArray(result.status)) {
+            return `${execution.serverName} checked git status: ${result.status.length ? `${result.status.length} entries` : 'clean'}.`;
+        }
+        if (Array.isArray(result.commits)) {
+            return `${execution.serverName} returned ${result.commits.length} commits.`;
+        }
+        if (result.ok && result.node) {
+            return `${execution.serverName} is healthy on Node ${result.node}.`;
+        }
+        if (Array.isArray(result.entries)) {
+            return `${execution.serverName} listed ${result.entries.length} project entries.`;
+        }
+        if (Array.isArray(result.notes)) {
+            return `${execution.serverName} listed ${result.notes.length} notes.`;
+        }
+        if (Array.isArray(result.matches)) {
+            return `${execution.serverName} found ${result.matches.length} matches.`;
+        }
+        if (result.title && result.url) {
+            return `${execution.serverName} fetched “${result.title}”.`;
+        }
+        if (result.screenshotBase64) {
+            return `${execution.serverName} captured a browser screenshot${result.url ? ` from ${result.url}` : ''}.`;
+        }
+        if (Array.isArray(result.files)) {
+            return `${execution.serverName} listed ${result.files.length} files${result.path ? ` in ${result.path}` : ''}.`;
+        }
+        if (Array.isArray(result)) {
+            return `${execution.serverName} returned ${result.length} items from ${execution.toolName}.`;
+        }
+        return `${execution.serverName} completed ${execution.toolName}.`;
+    }
+
+    function buildMcpFallbackResultMessage(execution) {
+        return {
+            role: 'user',
+            content: execution.status === 'success'
+                ? `MCP tool result from ${execution.serverName} / ${execution.toolName}. Use this result to answer my previous request:\n\n${sanitizeMcpToolResult(execution.result)}`
+                : `MCP tool ${execution.status} from ${execution.serverName} / ${execution.toolName}. Explain the failure and suggest the next fix:\n\n${execution.error || 'No output'}`
+        };
+    }
+
+    function extractReasoningFromDelta(delta) {
+        const parts = [];
+        if (typeof delta.reasoning === 'string') parts.push(delta.reasoning);
+        if (typeof delta.reasoning_content === 'string') parts.push(delta.reasoning_content);
+        if (Array.isArray(delta.reasoning_details)) {
+            parts.push(...delta.reasoning_details.map(formatReasoningDetail).filter(Boolean));
+        }
+        return parts.join('');
+    }
+
+    function formatReasoningDetail(detail) {
+        if (!detail || typeof detail !== 'object') return '';
+        if (typeof detail.text === 'string') return detail.text;
+        if (typeof detail.summary === 'string') return detail.summary;
+        if (detail.type === 'reasoning.encrypted') return '[Some reasoning content is encrypted]';
+        if (typeof detail.data === 'string' && detail.data.includes('[REDACTED]')) return '[Some reasoning content is redacted]';
+        return '';
+    }
+
+    function separateInlineThinking(content) {
+        const source = String(content || '');
+        let reasoning = '';
+        let visible = source.replace(/<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/gi, (match, thought) => {
+            reasoning += (reasoning ? '\n\n' : '') + thought.trim();
+            return '';
+        });
+        visible = visible.replace(/<\/think(?:ing)?>/gi, '');
+        return { content: visible.trimStart(), reasoning: reasoning.trim() };
     }
 
 async function readStreamingCompletion(response) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
+        let fullReasoning = '';
         let usage = null;
         let buffer = '';
         const toolCallParts = [];
@@ -202,9 +442,16 @@ async function readStreamingCompletion(response) {
                     if (parsed.usage) usage = normalizeUsage(parsed.usage);
                     const deltaObject = parsed.choices?.[0]?.delta || {};
                     const delta = deltaObject.content;
+                    const reasoningDelta = extractReasoningFromDelta(deltaObject);
+                    if (reasoningDelta) {
+                        fullReasoning += reasoningDelta;
+                        updateStreamingMessage(fullContent, fullReasoning);
+                    }
                     if (delta) {
                         fullContent += delta;
-                        updateStreamingMessage(fullContent);
+                        const separated = separateInlineThinking(fullContent);
+                        const visibleReasoning = [fullReasoning, separated.reasoning].filter(Boolean).join('\n\n').trim();
+                        updateStreamingMessage(separated.content, visibleReasoning);
                     }
                     for (const part of extractProviderToolCallsFromChunk(deltaObject)) {
                         const index = part.index || 0;
@@ -220,7 +467,14 @@ async function readStreamingCompletion(response) {
             if (done) break;
         }
 
-        return { content: fullContent, usage, toolCalls: parseProviderToolCallsFromMessage({ tool_calls: toolCallParts.filter(Boolean) }) };
+        const separated = separateInlineThinking(fullContent);
+        const reasoning = [fullReasoning, separated.reasoning].filter(Boolean).join('\n\n').trim();
+        return {
+            content: separated.content,
+            reasoning,
+            usage,
+            toolCalls: parseProviderToolCallsFromMessage({ tool_calls: toolCallParts.filter(Boolean) })
+        };
     }
 
     async function sendMessage() {
@@ -247,18 +501,29 @@ async function readStreamingCompletion(response) {
         
         state.isStreaming = true;
         state.followStream = true;
-        state.activeStream = { chatId: streamChatId, content: '', startedAt: Date.now(), mode: 'send' };
+        state.activeStream = {
+            chatId: streamChatId,
+            content: '',
+            reasoning: '',
+            thinkingRequested: getDeepSeekThinkingEnabled(),
+            thinkingProvider: state.provider,
+            thinkingModel: state.selectedModel?.id || null,
+            startedAt: Date.now(),
+            mode: 'send'
+        };
         state.abortController = new AbortController();
         el.stopBtn.classList.add('visible');
         el.sendBtn.disabled = true;
         updateStats();
+        updateDeepSeekThinkingUI();
         updateConversationNavState();
 
         addStreamingMessage();
 
         try {
+            await refreshMcpMemoryContext(userMessage.content || '');
             const result = await runCompletionWithMcpTools(buildApiMessages(state.messages));
-            finalizeStreamingMessage(result.content, result.usage, state.activeStream);
+            finalizeStreamingMessage(result.content, result.usage, state.activeStream, result.reasoning);
         } catch (error) {
             handleStreamFailure(error, { removeUserMessage: error.name !== 'AbortError', fallback: 'Failed to send message' });
         } finally {
@@ -268,7 +533,25 @@ async function readStreamingCompletion(response) {
             el.stopBtn.classList.remove('visible');
             updateStats();
             updateSendButton();
+            updateDeepSeekThinkingUI();
             updateConversationNavState();
+        }
+    }
+
+    async function refreshMcpMemoryContext(query) {
+        state.mcpMemoryContext = [];
+        const memoryServer = getWorkspaceMcpServers().find(server => server.type === 'memory' && server.enabled);
+        if (!memoryServer || location.protocol === 'file:') return;
+        try {
+            const response = await callMcpSystemTool('memory', 'memory_recall', {
+                query: String(query || '').slice(0, 1000),
+                limit: 5,
+                workspace: state.activeWorkspaceId || 'default'
+            });
+            state.mcpMemoryContext = response.result?.memories || response.memories || [];
+            updateContextInspector();
+        } catch (error) {
+            console.warn('MCP memory recall failed:', error.message || error);
         }
     }
 

@@ -7,7 +7,7 @@ function getBridgeBaseUrl(server = {}) {
 }
 
 function isBridgeServer(server = {}) {
-    return ['filesystem', 'markdown-vault', 'github', 'web-fetch'].includes(server.type)
+    return ['filesystem', 'browser', 'memory', 'markdown-vault', 'github', 'web-fetch', 'git', 'app-inspector', 'bridge-health', 'web-fetch-plus', 'notes-vault'].includes(server.type)
         || String(server.transport || '').startsWith('bridge');
 }
 
@@ -32,4 +32,43 @@ async function bridgeHealth(server = {}) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.error) throw new Error(data.error || `Bridge HTTP ${response.status}`);
     return data;
+}
+
+function getMcpSystemBaseUrl() {
+    return location.protocol === 'file:' ? '' : `${location.origin}/mcp`;
+}
+
+async function mcpSystemRequest(path, options = {}) {
+    const base = getMcpSystemBaseUrl();
+    if (!base) throw new Error('Local MCP bridge unavailable. Start the app with npm start.');
+    const response = await fetch(`${base}${path}`, {
+        method: options.method || 'GET',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: options.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success === false || data.error) {
+        throw new Error(data.error?.message || data.error || `MCP HTTP ${response.status}`);
+    }
+    return data;
+}
+
+const getMcpSystemStatus = () => mcpSystemRequest('/status');
+const getMcpSystemTools = (options = {}) => mcpSystemRequest(`/tools/all${options.includeInactive ? '?includeInactive=true' : ''}`);
+const getMcpSystemLog = () => mcpSystemRequest('/log');
+const getMcpSystemConfig = () => mcpSystemRequest('/config');
+const saveMcpSystemConfig = (config) => mcpSystemRequest('/config', { method: 'PUT', body: { config } });
+
+async function callMcpSystemTool(server, toolName, args = {}, options = {}) {
+    const normalizedServer = server === 'browser' ? 'browser' : server;
+    return mcpSystemRequest(`/${normalizedServer}/${toolName}`, {
+        method: 'POST',
+        body: args || {},
+        signal: options.signal
+    });
+}
+
+async function confirmMcpSystemOperation(server, operationId) {
+    return mcpSystemRequest(`/${server}/confirm/${operationId}`, { method: 'POST', body: {} });
 }

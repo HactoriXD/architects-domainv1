@@ -41,6 +41,18 @@
         }
     };
 
+    window.toggleMessageThinking = function(index) {
+        const panel = document.querySelector(`.message[data-index="${index}"] .message-thinking`);
+        const button = document.querySelector(`.message[data-index="${index}"] .message-thinking-toggle`);
+        if (!panel || !button) return;
+        const open = panel.classList.toggle('open');
+        button.setAttribute('aria-expanded', String(open));
+        const hasThinking = !panel.classList.contains('empty');
+        button.querySelector('span').textContent = open
+            ? 'Hide Thinking'
+            : hasThinking ? 'Show Thinking' : 'Thinking Unavailable';
+    };
+
     // Edit message
     window.editMessage = function(index) {
         const msgEl = document.querySelector(`.message[data-index="${index}"]`);
@@ -133,6 +145,8 @@ function renderMessages() {
             
             // Edit form (hidden by default) - escape content for safety
             const escapedContent = escapeHtml(msg.content);
+            const toolBodyHtml = isTool ? renderToolResultBody(msg) : '';
+            const thinkingHtml = !isUser && !isTool ? renderThinkingPanel(msg, i) : '';
             const editForm = `
                 <div class="message-edit-container">
                     <textarea class="message-edit-textarea">${escapedContent}</textarea>
@@ -151,7 +165,8 @@ function renderMessages() {
                 <div class="message-content">
                     <div class="message-header"><span class="message-role">${isUser ? 'You' : isTool ? 'MCP Tool' : CONFIG.ASSISTANT_NAME}</span><span class="message-time">${time}</span></div>
                     ${attachmentsHtml}
-                    <div class="message-body message-bubble">${formatMessageContent(msg.content)}</div>
+                    ${thinkingHtml}
+                    <div class="message-body message-bubble">${isTool ? toolBodyHtml : formatMessageContent(msg.content)}</div>
                     ${statusHtml}
                     ${editForm}
                     ${isTool ? '' : isUser ? userActions : assistantActions}
@@ -161,6 +176,120 @@ function renderMessages() {
         updateConversationNavState();
     }
 
+    function renderToolResultBody(msg) {
+        const status = escapeHtml(msg.status || 'done');
+        const server = escapeHtml(msg.serverName || 'MCP');
+        const tool = escapeHtml(msg.toolName || 'tool');
+        const preview = escapeHtml(msg.toolPreview || msg.content || 'Tool completed.');
+        const args = escapeHtml(JSON.stringify(msg.toolArgs || {}, null, 2));
+        const images = getToolResultImages(msg);
+        const output = escapeHtml(redactToolResultImagesForDisplay(String(msg.toolRawOutput || '').slice(0, 12000)));
+        const imagesHtml = images.map((image, index) => (
+            `<img class="tool-result-screenshot" src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt || `Tool image ${index + 1}`)}" loading="lazy" style="max-width:100%;border-radius:8px;margin-top:8px;">`
+        )).join('');
+        return `
+            <div class="tool-result-card">
+                <div class="tool-result-top">
+                    <span class="tool-result-pill ${status}">${status}</span>
+                    <strong>${server} / ${tool}</strong>
+                </div>
+                <div class="tool-result-preview">${preview}</div>
+                ${imagesHtml}
+                <details class="tool-result-details">
+                    <summary>Show tool output</summary>
+                    <div class="tool-result-grid">
+                        <div>
+                            <span>Arguments</span>
+                            <pre>${args}</pre>
+                        </div>
+                        <div>
+                            <span>Output</span>
+                            <pre>${output || 'No output'}</pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        `;
+    }
+
+    function getToolResultImages(msg) {
+        const images = [];
+        const seen = new Set();
+        const addImage = (image) => {
+            if (!image?.src || seen.has(image.src)) return;
+            seen.add(image.src);
+            images.push(image);
+        };
+        for (const image of msg.toolImages || []) addImage(image);
+        try {
+            collectToolResultImages(JSON.parse(msg.toolRawOutput || '{}'), addImage);
+        } catch (error) {
+            collectToolResultImages(msg.toolRawOutput || '', addImage);
+        }
+        return images.slice(0, 8);
+    }
+
+    function collectToolResultImages(value, addImage, key = '') {
+        if (value == null) return;
+        if (typeof value === 'string') {
+            const image = normalizeToolResultImage(value, key);
+            if (image) addImage(image);
+            return;
+        }
+        if (Array.isArray(value)) {
+            value.forEach(item => collectToolResultImages(item, addImage, key));
+            return;
+        }
+        if (typeof value === 'object') {
+            Object.entries(value).forEach(([childKey, childValue]) => {
+                collectToolResultImages(childValue, addImage, childKey);
+            });
+        }
+    }
+
+    function normalizeToolResultImage(value, key = '') {
+        const text = String(value || '').trim();
+        const hint = String(key || '').toLowerCase();
+        const dataUrlMatch = text.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)$/i);
+        if (dataUrlMatch) {
+            const ext = dataUrlMatch[1].toLowerCase() === 'jpg' ? 'jpeg' : dataUrlMatch[1].toLowerCase();
+            return { src: `data:image/${ext};base64,${dataUrlMatch[2].replace(/\s+/g, '')}`, alt: 'Tool image' };
+        }
+        const compact = text.replace(/\s+/g, '');
+        const keySuggestsImage = /screenshot|image|png|jpeg|jpg|base64|data/.test(hint);
+        if ((keySuggestsImage || compact.length > 1000) && compact.startsWith('iVBOR')) {
+            return { src: `data:image/png;base64,${compact}`, alt: 'Tool PNG image' };
+        }
+        if ((keySuggestsImage || compact.length > 1000) && compact.startsWith('/9j/')) {
+            return { src: `data:image/jpeg;base64,${compact}`, alt: 'Tool JPEG image' };
+        }
+        return null;
+    }
+
+    function redactToolResultImagesForDisplay(output) {
+        return output
+            .replace(/data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=\s]{80,}/gi, '[base64 image]')
+            .replace(/"((?:screenshot|screenshotBase64|image|data)[^"]*)"\s*:\s*"((?:iVBOR|\/9j\/)[A-Za-z0-9+/=\s]{80,})"/gi, '"$1": "[base64 image]"');
+    }
+
+    function renderThinkingPanel(msg, index) {
+        const text = String(msg?.reasoning || '').trim();
+        const wasRequested = Boolean(msg?.reasoningRequested);
+        if (!text && !wasRequested) return '';
+        const provider = PROVIDERS[msg?.reasoningProvider]?.label || getProvider().label;
+        const body = text || `${provider} did not return visible thinking for this response. Some models keep reasoning hidden even when thinking is enabled, or only return summaries/encrypted placeholders.`;
+        const buttonText = text ? 'Show Thinking' : 'Thinking Unavailable';
+        return `
+            <div class="message-thinking ${text ? '' : 'empty'}">
+                <button class="message-thinking-toggle" type="button" aria-expanded="false" onclick="toggleMessageThinking(${index})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.93 4.93l2.12 2.12"/><path d="M16.95 16.95l2.12 2.12"/><path d="M19.07 4.93l-2.12 2.12"/><path d="M7.05 16.95l-2.12 2.12"/></svg>
+                    <span>${buttonText}</span>
+                </button>
+                <div class="message-thinking-body">${formatMessageContent(body)}</div>
+            </div>
+        `;
+    }
+
     function addStreamingMessage(options = {}) {
         if (document.getElementById('streaming-message')) return;
         const div = document.createElement('div');
@@ -168,6 +297,13 @@ function renderMessages() {
         div.id = 'streaming-message';
         div.innerHTML = `<div class="message-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
             <div class="message-content"><div class="message-header"><span class="message-role">${CONFIG.ASSISTANT_NAME}</span><span class="message-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></div>
+            <div class="message-thinking streaming-thinking" hidden>
+                <button class="message-thinking-toggle" type="button" aria-expanded="false" onclick="this.closest('.message-thinking').classList.toggle('open'); this.setAttribute('aria-expanded', String(this.closest('.message-thinking').classList.contains('open'))); this.querySelector('span').textContent = this.closest('.message-thinking').classList.contains('open') ? 'Hide Thinking' : 'Show Thinking';">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.93 4.93l2.12 2.12"/><path d="M16.95 16.95l2.12 2.12"/><path d="M19.07 4.93l-2.12 2.12"/><path d="M7.05 16.95l-2.12 2.12"/></svg>
+                    <span>Show Thinking</span>
+                </button>
+                <div class="message-thinking-body"></div>
+            </div>
             <div class="message-body message-bubble"><div class="typing-indicator"><span class="typing-bar"></span></div></div></div>`;
         el.messagesList.appendChild(div);
         updateConversationNavState();
@@ -192,6 +328,19 @@ function renderMessages() {
         if (div) {
             const shouldFollowStream = state.followStream && isNearMessageBottom(120);
             const body = div.querySelector('.message-body');
+            const thinking = div.querySelector('.streaming-thinking');
+            const thinkingBody = thinking?.querySelector('.message-thinking-body');
+            if (thinking && thinkingBody) {
+                const reasoning = String(state.activeStream?.reasoning || '').trim();
+                const requested = Boolean(state.activeStream?.thinkingRequested);
+                thinking.hidden = !reasoning && !requested;
+                thinking.classList.toggle('empty', !reasoning && requested);
+                const toggleLabel = thinking.querySelector('.message-thinking-toggle span');
+                if (toggleLabel) toggleLabel.textContent = reasoning ? 'Show Thinking' : 'Thinking Requested';
+                thinkingBody.innerHTML = reasoning
+                    ? formatMessageContent(reasoning, false, true)
+                    : formatMessageContent('Waiting for visible thinking from the provider...', false, true);
+            }
             if (pendingStreamingContent.includes('```')) {
                 body.style.whiteSpace = '';
                 body.innerHTML = formatMessageContent(pendingStreamingContent, false, true);
@@ -209,8 +358,9 @@ function renderMessages() {
         }
     }
 
-    function updateStreamingMessage(content) {
+    function updateStreamingMessage(content, reasoning = null) {
         if (state.activeStream) state.activeStream.content = content;
+        if (state.activeStream && reasoning !== null) state.activeStream.reasoning = String(reasoning || '');
         if (state.activeStream && state.activeStream.chatId !== state.currentChatId) return;
         pendingStreamingContent = String(content ?? '');
         if (streamingRenderFrame === null) {

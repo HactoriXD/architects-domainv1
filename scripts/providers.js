@@ -221,17 +221,21 @@ const PROVIDERS = {
             : `${provider.label} direct API does not expose web search`;
     }
 
-    function getDeepSeekThinkingEnabled(modelId = state.selectedModel?.id) {
-        if (!modelId) return false;
-        return Boolean(state.providerSettings.deepseek?.thinkingByModel?.[modelId]);
+    function supportsThinkingControl(providerId = state.provider) {
+        return ['deepseek', 'openrouter', 'venice'].includes(providerId);
     }
 
-    function setDeepSeekThinkingEnabled(enabled, modelId = state.selectedModel?.id) {
-        if (!modelId) return;
-        state.providerSettings.deepseek = {
-            ...(state.providerSettings.deepseek || {}),
+    function getDeepSeekThinkingEnabled(modelId = state.selectedModel?.id, providerId = state.provider) {
+        if (!modelId || !supportsThinkingControl(providerId)) return false;
+        return Boolean(state.providerSettings[providerId]?.thinkingByModel?.[modelId]);
+    }
+
+    function setDeepSeekThinkingEnabled(enabled, modelId = state.selectedModel?.id, providerId = state.provider) {
+        if (!modelId || !supportsThinkingControl(providerId)) return;
+        state.providerSettings[providerId] = {
+            ...(state.providerSettings[providerId] || {}),
             thinkingByModel: {
-                ...(state.providerSettings.deepseek?.thinkingByModel || {}),
+                ...(state.providerSettings[providerId]?.thinkingByModel || {}),
                 [modelId]: Boolean(enabled)
             }
         };
@@ -240,10 +244,32 @@ const PROVIDERS = {
     }
 
     function updateDeepSeekThinkingUI() {
-        if (!el.deepSeekThinkingGroup || !el.deepSeekThinkingToggle) return;
-        const isDeepSeekModel = state.provider === 'deepseek' && Boolean(state.selectedModel);
-        el.deepSeekThinkingGroup.hidden = !isDeepSeekModel;
-        el.deepSeekThinkingToggle.checked = isDeepSeekModel && getDeepSeekThinkingEnabled();
+        const provider = getProvider();
+        const canThink = supportsThinkingControl(state.provider) && Boolean(state.selectedModel);
+        const thinkingEnabled = canThink && getDeepSeekThinkingEnabled();
+
+        if (el.deepSeekThinkingGroup && el.deepSeekThinkingToggle) {
+            el.deepSeekThinkingGroup.hidden = !canThink;
+            el.deepSeekThinkingToggle.checked = thinkingEnabled;
+            if (el.thinkingSettingsTitle) el.thinkingSettingsTitle.textContent = `Enable ${provider.label} Thinking Mode`;
+            if (el.thinkingSettingsHint) {
+                el.thinkingSettingsHint.textContent = `${provider.label} will request visible reasoning when the selected model supports it.`;
+            }
+        }
+
+        if (el.deepSeekThinkingButton && el.deepSeekThinkingButtonLabel) {
+            el.deepSeekThinkingButton.hidden = !canThink;
+            el.deepSeekThinkingButton.classList.toggle('active', thinkingEnabled);
+            el.deepSeekThinkingButton.classList.toggle('generating', thinkingEnabled && state.isStreaming);
+            el.deepSeekThinkingButton.setAttribute('aria-pressed', String(thinkingEnabled));
+            el.deepSeekThinkingButtonLabel.textContent = thinkingEnabled ? 'THINKING ON' : 'THINKING OFF';
+            if (el.thinkingProviderLabel) el.thinkingProviderLabel.textContent = provider.label;
+            el.deepSeekThinkingButton.title = thinkingEnabled
+                ? state.isStreaming
+                    ? `${provider.label} thinking is active during generation`
+                    : `${provider.label} thinking is on for this model`
+                : `${provider.label} thinking is off for this model`;
+        }
     }
 
     async function changeProvider(providerId) {
@@ -351,7 +377,7 @@ const PROVIDERS = {
 
 // API Communication
     // ============================================
-    function buildRequestBody(apiMessages) {
+    function buildRequestBody(apiMessages, options = {}) {
         const provider = getProvider();
         const requestBody = {
             model: state.selectedModel.id,
@@ -369,7 +395,9 @@ const PROVIDERS = {
         if (state.webSearchEnabled && provider.searchMode === 'openrouter-tool') {
             requestBody.tools = [{ type: 'openrouter:web_search', parameters: { max_results: 5, search_context_size: 'medium' } }];
         }
-        const mcpTools = typeof buildProviderToolDefinitions === 'function' ? buildProviderToolDefinitions() : [];
+        const mcpTools = options.includeMcpTools === false
+            ? []
+            : (typeof buildProviderToolDefinitions === 'function' ? buildProviderToolDefinitions() : []);
         if (mcpTools.length && !(state.webSearchEnabled && provider.searchMode === 'openrouter-tool')) {
             requestBody.tools = mcpTools;
             requestBody.tool_choice = 'auto';
@@ -380,10 +408,26 @@ const PROVIDERS = {
                 enable_web_citations: true
             };
         }
-        if (state.provider === 'deepseek') {
-            const thinkingEnabled = getDeepSeekThinkingEnabled(state.selectedModel?.id);
+        if (supportsThinkingControl(state.provider)) {
+            const thinkingEnabled = getDeepSeekThinkingEnabled(state.selectedModel?.id, state.provider);
+            if (state.provider === 'openrouter') {
+                requestBody.reasoning = thinkingEnabled
+                    ? { enabled: true, effort: 'high', exclude: false }
+                    : { enabled: false, effort: 'none', exclude: true };
+            } else if (state.provider === 'venice') {
+                requestBody.reasoning = thinkingEnabled
+                    ? { enabled: true, effort: 'high', summary: 'auto' }
+                    : { enabled: false };
+                requestBody.reasoning_effort = thinkingEnabled ? 'high' : 'none';
+                requestBody.venice_parameters = {
+                    ...(requestBody.venice_parameters || {}),
+                    disable_thinking: !thinkingEnabled,
+                    strip_thinking_response: !thinkingEnabled
+                };
+            } else if (state.provider === 'deepseek') {
             requestBody.thinking = { type: thinkingEnabled ? 'enabled' : 'disabled' };
             if (thinkingEnabled) requestBody.reasoning_effort = 'high';
+            }
         }
 
         return requestBody;
@@ -484,6 +528,15 @@ const PROVIDERS = {
         };
     }
 
+    function buildMcpMemoryContextMessage(memories = state.mcpMemoryContext || []) {
+        if (!memories.length) return null;
+        const lines = memories.slice(0, 5).map(memory => `- [${memory.importance || 'memory'}${memory.tags?.length ? `; ${memory.tags.join(', ')}` : ''}] ${memory.content}`);
+        return {
+            role: 'system',
+            content: `Relevant Memory MCP recall. Use these local memories only when relevant, and do not mention this context unless asked.\n\n${lines.join('\n')}`
+        };
+    }
+
     function getEnabledImportedFilesForContext(workspace = getActiveWorkspace()) {
         return [...(workspace?.importedFiles || [])]
             .filter(file => file.enabled && file.content)
@@ -537,6 +590,8 @@ const PROVIDERS = {
         const workspaceNotesMessage = buildWorkspaceNotesMessage();
         if (workspaceNotesMessage) apiMessages.push(workspaceNotesMessage);
         const pinnedMessage = buildPinnedContextMessage(pinnedNotes);
+        const mcpMemoryMessage = buildMcpMemoryContextMessage();
+        if (mcpMemoryMessage) apiMessages.push(mcpMemoryMessage);
         const memoryMessage = buildMemoryContextMessage();
         if (memoryMessage) apiMessages.push(memoryMessage);
         const lorebookMessage = buildLorebookContextMessage();

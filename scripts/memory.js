@@ -297,14 +297,17 @@
         for (const memory of getEnabledMemoriesForContext()) {
             sources.push({ type: 'Memory', label: memory.content, detail: MEMORY_CATEGORIES[memory.category] || 'Memory', active: true });
         }
+        for (const memory of (state.mcpMemoryContext || [])) {
+            sources.push({ type: 'Memory MCP', label: memory.content, detail: `${memory.importance || 'memory'}${memory.relevance ? ` · ${memory.relevance}` : ''}`, active: true });
+        }
         for (const entry of getEnabledLorebooksForContext()) {
             sources.push({ type: 'Lore', label: entry.title, detail: entry.pinned ? 'Pinned lorebook' : 'Lorebook', active: true });
         }
         for (const file of getEnabledImportedFilesForContext()) {
             sources.push({ type: 'File', label: file.name, detail: formatFileSize(file.size), active: true });
         }
-        for (const server of getWorkspaceMcpServers().filter(server => server.enabled)) {
-            const tools = (server.capabilities || []).filter(capability => capability.kind === 'tool');
+        for (const server of getWorkspaceMcpServers().filter(server => typeof isMcpServerActiveInCurrentChat === 'function' ? isMcpServerActiveInCurrentChat(server) : server.enabled)) {
+            const tools = (server.capabilities || []).filter(capability => capability.kind === 'tool' && (typeof isMcpToolEnabledForChat !== 'function' || isMcpToolEnabledForChat(server, capability)));
             sources.push({
                 type: 'MCP',
                 label: server.name,

@@ -58,6 +58,9 @@
             slider.addEventListener('change', saveSettings);
         });
         el.deepSeekThinkingToggle.addEventListener('change', (e) => setDeepSeekThinkingEnabled(e.target.checked));
+        el.deepSeekThinkingButton.addEventListener('click', () => {
+            setDeepSeekThinkingEnabled(!getDeepSeekThinkingEnabled());
+        });
         el.resetSettingsBtn.addEventListener('click', resetSettings);
 
         el.systemPromptHeader.addEventListener('click', toggleSystemPrompt);

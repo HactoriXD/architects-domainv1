@@ -18,10 +18,36 @@ function normalizeMcpServerRecord(server) {
     return server;
 }
 
+function isMcpSystemServer(server = {}) {
+    if (server.transport === 'mcp-system') return true;
+    if (['browser', 'memory'].includes(server.type)) return true;
+    return server.type === 'filesystem' && String(server.endpoint || '').includes('/mcp');
+}
+
 async function mcpRuntimeConnect(server, options = {}) {
     normalizeMcpServerRecord(server);
+    if (isMcpSystemServer(server)) return connectMcpSystemServer(server, options);
     if (server.transport === 'bridge' || isBridgeServer(server)) return connectBridgeMcpServer(server, options);
     return connectHttpMcpServer(server, options);
+}
+
+async function connectMcpSystemServer(server, options = {}) {
+    const [status, toolsResult] = await Promise.all([
+        getMcpSystemStatus(),
+        getMcpSystemTools({ includeInactive: true })
+    ]);
+    const tools = (toolsResult.tools || [])
+        .filter(tool => tool.server === server.type)
+        .map(tool => normalizeMcpTool(server, { ...tool, inputSchema: tool.inputSchema || { type: 'object', properties: tool.parameters || {} } }));
+    const serverStatus = (status.servers || []).find(item => item.type === server.type);
+    return {
+        status: serverStatus?.status === 'unconfigured' ? 'untested' : 'connected',
+        health: { state: serverStatus?.status || 'online', checkedAt: Date.now(), label: serverStatus?.name || server.name },
+        capabilities: tools,
+        resources: [],
+        lastSeenAt: Date.now(),
+        lastError: ''
+    };
 }
 
 async function connectBridgeMcpServer(server, options = {}) {
@@ -67,6 +93,12 @@ async function connectHttpMcpServer(server, options = {}) {
 
 async function mcpRuntimeListTools(server, options = {}) {
     normalizeMcpServerRecord(server);
+    if (isMcpSystemServer(server)) {
+        const result = await getMcpSystemTools({ includeInactive: true });
+        return (result.tools || [])
+            .filter(tool => tool.server === server.type)
+            .map(tool => normalizeMcpTool(server, { ...tool, inputSchema: tool.inputSchema || { type: 'object', properties: tool.parameters || {} } }));
+    }
     if (server.transport === 'bridge' || isBridgeServer(server)) {
         const result = await bridgeRequest(server, '/tools/list', { server: serializeMcpServerForBridge(server) }, options);
         return (result.tools || []).map(tool => normalizeMcpTool(server, tool));
@@ -77,6 +109,10 @@ async function mcpRuntimeListTools(server, options = {}) {
 
 async function mcpRuntimeCallTool(server, toolName, args = {}, options = {}) {
     normalizeMcpServerRecord(server);
+    if (isMcpSystemServer(server)) {
+        const result = await callMcpSystemTool(server.type, toolName, args || {}, options);
+        return result.result ?? result;
+    }
     if (server.transport === 'bridge' || isBridgeServer(server)) {
         const result = await bridgeRequest(server, '/tools/call', {
             server: serializeMcpServerForBridge(server),

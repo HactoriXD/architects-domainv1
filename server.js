@@ -45,12 +45,14 @@ function serveStatic(requestPath, res) {
   const relativePath = cleanPath === '/' ? 'index.html' : cleanPath.replace(/^\/+/, '');
   const filePath = path.resolve(ROOT, relativePath);
 
-  if (!filePath.startsWith(ROOT) || filePath.includes(`${path.sep}.env`)) {
+  const blockedRuntimeFiles = new Set(['.env', 'mcp-config.json', 'mcp-memory.json', 'mcp-audit.log']);
+  if (!filePath.startsWith(ROOT) || blockedRuntimeFiles.has(path.basename(filePath))) {
     sendText(res, 403, 'Forbidden');
     return;
   }
 
   fs.stat(filePath, (err, stat) => {
+    if (res.headersSent || res.destroyed) return;
     if (err || !stat.isFile()) {
       sendText(res, 404, 'Not found');
       return;
@@ -66,6 +68,7 @@ function serveStatic(requestPath, res) {
 }
 
 function sendJson(res, status, payload) {
+  if (res.headersSent || res.destroyed) return;
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store'
@@ -74,6 +77,7 @@ function sendJson(res, status, payload) {
 }
 
 function sendText(res, status, text) {
+  if (res.headersSent || res.destroyed) return;
   res.writeHead(status, {
     'Content-Type': 'text/plain; charset=utf-8',
     'Cache-Control': 'no-store'

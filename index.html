@@ -19,6 +19,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Architect's Domain">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%238b5cf6'/%3E%3Cpath d='M32 10l6.2 14 15.1 1.6-11.3 10.2 3.2 14.9L32 43.1 18.8 50.7 22 35.8 10.7 25.6 25.8 24 32 10z' fill='none' stroke='white' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E">
     <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkFyY2hpdGVjdCdzIERvbWFpbiIsCiAgInNob3J0X25hbWUiOiAiQXJjaGl0ZWN0IiwKICAiZGVzY3JpcHRpb24iOiAiQSBwb3dlcmZ1bCBBSSBjaGF0IGludGVyZmFjZSIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDUwNTA1IiwKICAidGhlbWVfY29sb3IiOiAiIzhiNWNmNiIsCiAgImljb25zIjogW3sKICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sLCUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nbm9uZScgc3Ryb2tlPSclMjM4YjVjZjYnIHN0cm9rZS13aWR0aD0nMiclM0UlM0Nwb2x5Z29uIHBvaW50cz0nMTIgMiAxNS4wOSA4LjI2IDIyIDkuMjcgMTcgMTQuMTQgMTguMTggMjEuMDIgMTIgMTcuNzcgNS44MiAyMS4wMiA3IDE0LjE0IDIgOS4yNyA4LjkxIDguMjYgMTIgMicvJTNFJTNDL3N2ZyUzRSIsCiAgICAic2l6ZXMiOiAiYW55IiwKICAgICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiCiAgfV0KfQ==">
 </head>
 <body>
@@ -41,7 +42,7 @@
                 </button>
                 <div class="workspace-switcher-menu" id="workspaceSwitcherMenu"></div>
             </div>
-            <button class="new-chat-btn" id="newChatBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Chat</button>
+            <button class="new-chat-btn" id="newChatBtn">New Chat</button>
             <button class="workspace-manage-btn" id="workspaceManageBtn" type="button">Manage Workspaces</button>
         </div>
         <div class="sidebar-search">
@@ -84,33 +85,48 @@
                     <span id="webSearchStatus">Off</span>
                     <span class="toggle-track" aria-hidden="true"></span>
                 </button>
-                <div class="context-toggle">
-                    <button class="btn btn-icon" id="contextInspectorBtn" title="Context sources"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="8" cy="7" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="17" r="1"/></svg></button>
-                    <div class="context-inspector-panel" id="contextInspectorPanel">
-                        <div class="context-inspector-header">
-                            <h3 class="settings-title">Context Sources</h3>
-                            <span class="context-summary" id="contextSourcesSummary">0 active</span>
+                <button class="deepseek-thinking-button" id="deepSeekThinkingButton" type="button" hidden title="Toggle thinking mode">
+                    <span class="thinking-orbit" aria-hidden="true"></span>
+                    <span class="thinking-copy">
+                        <span class="thinking-kicker" id="thinkingProviderLabel">Thinking</span>
+                        <span class="thinking-state" id="deepSeekThinkingButtonLabel">THINKING OFF</span>
+                    </span>
+                </button>
+                <div class="header-control-cluster">
+                    <div class="context-toggle">
+                        <button class="btn btn-icon" id="contextInspectorBtn" title="Context sources"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="8" cy="7" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="17" r="1"/></svg></button>
+                        <div class="context-inspector-panel" id="contextInspectorPanel">
+                            <div class="context-inspector-header">
+                                <h3 class="settings-title">Context Sources</h3>
+                                <span class="context-summary" id="contextSourcesSummary">0 active</span>
+                            </div>
+                            <div class="context-sources-list" id="contextSourcesList"></div>
                         </div>
-                        <div class="context-sources-list" id="contextSourcesList"></div>
                     </div>
                 </div>
-                <button class="btn btn-icon" id="memoryManagerBtn" title="Memory manager"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 4 6v3h6v-3c2-1 4-3 4-6a7 7 0 0 0-7-7z"/><path d="M9 21h6"/><path d="M10 10h4"/></svg></button>
-                <!-- Export -->
-                <div class="export-toggle">
-                    <button class="btn btn-icon" id="exportBtn" title="Export chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-                    <div class="export-panel" id="exportPanel">
-                        <h3 class="settings-title">Export Chat</h3>
-                        <button class="export-option" onclick="exportAsMarkdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Markdown (.md)</button>
-                        <button class="export-option" onclick="exportAsJSON()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>JSON (.json)</button>
-                        <button class="export-option" onclick="exportAsText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Plain Text (.txt)</button>
-                        <button class="export-option" onclick="exportAsHTML()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>HTML (.html)</button>
+                <div class="header-control-cluster">
+                    <button class="btn btn-icon" id="mcpControlCenterBtn" title="MCP Control Center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M8.6 7.6 10.8 15"/><path d="M15.4 7.6 13.2 15"/><path d="M9 6h6"/></svg></button>
+                </div>
+                <div class="header-control-cluster">
+                    <button class="btn btn-icon" id="memoryManagerBtn" title="Memory manager"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 4 6v3h6v-3c2-1 4-3 4-6a7 7 0 0 0-7-7z"/><path d="M9 21h6"/><path d="M10 10h4"/></svg></button>
+                    <!-- Export -->
+                    <div class="export-toggle">
+                        <button class="btn btn-icon" id="exportBtn" title="Export chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                        <div class="export-panel" id="exportPanel">
+                            <h3 class="settings-title">Export Chat</h3>
+                            <button class="export-option" onclick="exportAsMarkdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Markdown (.md)</button>
+                            <button class="export-option" onclick="exportAsJSON()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>JSON (.json)</button>
+                            <button class="export-option" onclick="exportAsText()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Plain Text (.txt)</button>
+                            <button class="export-option" onclick="exportAsHTML()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>HTML (.html)</button>
+                        </div>
                     </div>
                 </div>
-                <!-- Keyboard shortcuts -->
-                <button class="btn btn-icon" id="shortcutsBtn" title="Keyboard shortcuts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="M6 8h.001"/><path d="M10 8h.001"/><path d="M14 8h.001"/><path d="M18 8h.001"/><path d="M8 12h.001"/><path d="M12 12h.001"/><path d="M16 12h.001"/><line x1="6" y1="16" x2="18" y2="16"/></svg></button>
-                <!-- Settings -->
-                <div class="settings-toggle">
-                    <button class="btn btn-icon" id="settingsBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                <div class="header-control-cluster">
+                    <!-- Keyboard shortcuts -->
+                    <button class="btn btn-icon" id="shortcutsBtn" title="Keyboard shortcuts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><path d="M7 8h.01"/><path d="M11 8h.01"/><path d="M15 8h.01"/><path d="M17 12H7"/></svg></button>
+                    <!-- Settings -->
+                    <div class="settings-toggle">
+                        <button class="btn btn-icon" id="settingsBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
                     <div class="settings-panel" id="settingsPanel">
                         <h3 class="settings-title">Providers</h3>
                         <div class="settings-group">
@@ -148,31 +164,6 @@
                             <div class="settings-hint">Export, import, reset, or clear browser-local chats, memories, workspaces, MCP servers, and keys.</div>
                         </div>
                         <div class="settings-divider"></div>
-                        <h3 class="settings-title">MCP Servers</h3>
-                        <div class="settings-group">
-                            <div class="settings-label"><span>Server Type</span></div>
-                            <select class="settings-select" id="mcpServerType"></select>
-                            <div class="settings-hint">Built-in presets use the local bridge from npm start. Custom endpoints can use browser HTTP/SSE MCP.</div>
-                        </div>
-                        <div class="settings-group">
-                            <div class="settings-label"><span>Server Name</span></div>
-                            <input type="text" class="settings-input" id="mcpServerName" placeholder="Project filesystem, GitHub, vault...">
-                        </div>
-                        <div class="settings-group">
-                            <div class="settings-label"><span>HTTP Endpoint</span></div>
-                            <input type="url" class="settings-input" id="mcpServerEndpoint" placeholder="http://localhost:7331/mcp">
-                            <div class="provider-actions">
-                                <button class="btn" id="mcpAddServerBtn" type="button">Add Server</button>
-                            </div>
-                        </div>
-                        <div class="settings-group">
-                            <div class="settings-label"><span>Bridge Config JSON</span><span class="provider-status" id="mcpBridgeStatus">Bridge unknown</span></div>
-                            <textarea class="settings-input mcp-config-input" id="mcpServerConfig" rows="5" spellcheck="false" placeholder='{"root":"C:\\Users\\USER\\Desktop\\architects-domain"}'></textarea>
-                            <div class="settings-hint">Filesystem/vault use root. GitHub uses owner, repo, and optional token. This stays local to your browser.</div>
-                        </div>
-                        <div class="mcp-server-list" id="mcpServerList"></div>
-                        <div class="mcp-execution-list" id="mcpExecutionList"></div>
-                        <div class="settings-divider"></div>
                         <h3 class="settings-title">Generation Settings</h3>
                         <div class="settings-group">
                             <div class="settings-label"><span>Temperature</span><span class="settings-value" id="tempValue">0.7</span></div>
@@ -208,8 +199,8 @@
                             <label class="settings-check-row" for="deepSeekThinkingToggle">
                                 <input type="checkbox" id="deepSeekThinkingToggle">
                                 <span>
-                                    <strong>Enable Thinking Mode</strong>
-                                    <small>Allows the model to use extended reasoning (slower, more expensive)</small>
+                                    <strong id="thinkingSettingsTitle">Enable Thinking Mode</strong>
+                                    <small id="thinkingSettingsHint">Allows the model to use extended reasoning (slower, more expensive)</small>
                                 </span>
                             </label>
                         </div>
@@ -285,22 +276,30 @@
             <div class="messages-container" id="messagesContainer">
                 <div class="empty-state" id="emptyState">
                     <div class="empty-state-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-                    <h2 class="empty-state-title">Welcome to Architect's Domain</h2>
-                    <p class="empty-state-subtitle">Select a model and send a message to begin. You can attach images and files.</p>
+                    <h2 class="empty-state-title">Welcome to <span>Architect's Domain</span></h2>
+                    <p class="empty-state-subtitle">// select a model &middot; send your first message</p>
                     <div class="quick-start-grid">
-                        <button class="quick-start-card" data-prompt="Start a focused chat. Ask me three useful questions, then help me turn the answers into a concrete next step.">
+                        <button class="quick-start-card" type="button" data-prompt="Start a focused chat. Ask me three useful questions, then help me turn the answers into a concrete next step.">
+                            <span class="quick-start-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v10H8l-4 4V5z"/><path d="M8 9h8"/><path d="M8 12h5"/></svg></span>
+                            <span class="quick-start-tag">// focus</span>
                             <span class="quick-start-title">Start a chat</span>
                             <span class="quick-start-desc">Open with clarity, structure, and momentum.</span>
                         </button>
-                        <button class="quick-start-card" data-prompt="Help me create a vivid character. Build their voice, desires, contradictions, boundaries, and first scene.">
+                        <button class="quick-start-card" type="button" data-prompt="Help me create a vivid character. Build their voice, desires, contradictions, boundaries, and first scene.">
+                            <span class="quick-start-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7L6.8 19l1-5.8L3.6 9.1l5.8-.8L12 3z"/><path d="M9.5 12.5l1.5 1.5 3.5-4"/></svg></span>
+                            <span class="quick-start-tag">// creative</span>
                             <span class="quick-start-title">Create a Character</span>
                             <span class="quick-start-desc">Shape voice, motive, conflict, and presence.</span>
                         </button>
-                        <button class="quick-start-card" data-prompt="I will attach a file. Analyze it for structure, risks, missing pieces, and the most useful next actions.">
+                        <button class="quick-start-card" type="button" data-prompt="I will attach a file. Analyze it for structure, risks, missing pieces, and the most useful next actions.">
+                            <span class="quick-start-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14h6"/><path d="M9 17h4"/><path d="M9 11h2"/></svg></span>
+                            <span class="quick-start-tag">// analysis</span>
                             <span class="quick-start-title">Analyze a File</span>
                             <span class="quick-start-desc">Review documents, code, notes, or exports.</span>
                         </button>
-                        <button class="quick-start-card" data-prompt="Brainstorm ideas for a project: name, audience, aesthetic, core features, workflows, and what makes it memorable.">
+                        <button class="quick-start-card" type="button" data-prompt="Brainstorm ideas for a project: name, audience, aesthetic, core features, workflows, and what makes it memorable.">
+                            <span class="quick-start-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M8.5 14.5A6 6 0 1 1 15.5 14c-.9.7-1.5 1.7-1.5 3h-4c0-1.1-.5-1.9-1.5-2.5z"/><path d="M12 6v3"/><path d="M9.5 9.5l5-2"/></svg></span>
+                            <span class="quick-start-tag">// ideation</span>
                             <span class="quick-start-title">Brainstorm ideas</span>
                             <span class="quick-start-desc">Explore identity, product shape, and direction.</span>
                         </button>
@@ -327,6 +326,7 @@
                                 <div class="input-stats">
                                     <div class="input-stat" id="tokenUsageStat" title="Estimated while typing; exact after provider usage returns"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg><span>In <span class="input-stat-value" id="inputTokens">0</span> / Out <span class="input-stat-value" id="outputTokens">0</span></span></div>
                                     <div class="input-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg><span><span class="input-stat-value" id="contextUsed">0</span>/<span id="contextMax">0</span></span></div>
+                                    <div class="input-stat mcp-composer-indicator" id="mcpComposerIndicator" title="Active MCP tools" tabindex="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M8.6 7.6 10.8 15"/><path d="M15.4 7.6 13.2 15"/></svg><span>0 MCP tools</span><div class="mcp-composer-dropdown" id="mcpComposerDropdown"></div></div>
                                 </div>
                             </div>
                             <div class="input-actions">
@@ -433,6 +433,43 @@
         </div>
     </div>
 
+    <div class="modal-overlay mcp-control-overlay" id="mcpControlCenterModal">
+        <div class="modal mcp-control-modal">
+            <div class="mcp-control-header">
+                <div>
+                    <div class="modal-kicker">MCP Operations Center</div>
+                    <h3 class="modal-title">Tool Servers</h3>
+                </div>
+                <div class="mcp-control-stats">
+                    <span><strong id="mcpTotalServers">0</strong> servers</span>
+                    <span><strong id="mcpConnectedServers">0</strong> connected</span>
+                    <span><strong id="mcpTotalTools">0</strong> tools</span>
+                    <span><strong id="mcpActiveTools">0</strong> active</span>
+                    <span><strong id="mcpFailedServers">0</strong> failed</span>
+                </div>
+                <button class="workspace-close-btn" id="mcpControlCloseBtn" type="button" aria-label="Close MCP Control Center">&times;</button>
+            </div>
+            <div class="mcp-control-grid">
+                <section class="mcp-control-column mcp-server-column">
+                    <div class="mcp-column-title">Servers</div>
+                    <div class="mcp-control-server-list" id="mcpControlServerList"></div>
+                    <button class="btn btn-primary mcp-add-server" id="mcpControlAddServerBtn" type="button">Add Server</button>
+                </section>
+                <section class="mcp-control-column mcp-config-column">
+                    <div class="mcp-column-title">Configuration</div>
+                    <div class="mcp-config-form" id="mcpControlConfig"></div>
+                </section>
+                <section class="mcp-control-column mcp-tools-column">
+                    <div class="mcp-column-title">Tool Inspector</div>
+                    <div class="mcp-tool-inspector" id="mcpToolInspector"></div>
+                    <div class="mcp-column-title mcp-feed-title">Activity</div>
+                    <div class="mcp-activity-feed" id="mcpActivityFeed"></div>
+                </section>
+            </div>
+            <input id="mcpImportInput" type="file" accept="application/json,.json" hidden>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="workspaceModal">
         <div class="modal workspace-modal">
             <div class="workspace-modal-header">
@@ -514,7 +551,7 @@
         <div class="modal data-manager-modal">
             <div class="data-manager-header">
                 <div>
-                    <div class="modal-kicker">Local browser storage</div>
+                    <div class="modal-kicker">Storage Manager</div>
                     <h3 class="modal-title">Data Manager</h3>
                     <p class="workspace-modal-subtitle">Back up or clear local data before publishing screenshots, sharing a machine, or switching browsers.</p>
                 </div>
@@ -522,11 +559,28 @@
             </div>
             <div class="storage-meter">
                 <div class="storage-meter-top">
-                    <span id="dataStorageUsage">Calculating storage...</span>
+                    <span id="dataStorageUsage">Settings Storage</span>
                     <span id="dataStoragePercent"></span>
                 </div>
                 <div class="storage-meter-track"><span id="dataStorageBar"></span></div>
+                <div class="storage-meter-top" style="margin-top:10px">
+                    <span id="idbStorageUsage">Chat Storage (IndexedDB)</span>
+                    <span id="idbStoragePercent"></span>
+                </div>
+                <div class="storage-meter-track"><span id="idbStorageBar"></span></div>
                 <div class="settings-hint" id="dataStorageHint">Browser quota varies by browser and disk space.</div>
+            </div>
+            <div class="storage-details" id="storageDetailsSection">
+                <button class="storage-details-toggle" id="storageDetailsToggle" type="button">
+                    <span>Storage Details</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="storage-details-body" id="storageDetailsBody" hidden>
+                    <div class="storage-detail-row"><span>Chats stored</span><span id="storageDetailChats">-</span></div>
+                    <div class="storage-detail-row"><span>Total messages</span><span id="storageDetailMessages">-</span></div>
+                    <div class="storage-detail-row"><span>Oldest chat</span><span id="storageDetailOldest">-</span></div>
+                    <div class="storage-detail-row"><span>Largest chat</span><span id="storageDetailLargest">-</span></div>
+                </div>
             </div>
             <div class="data-manager-grid">
                 <section class="data-manager-card">
@@ -557,6 +611,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="scripts/state.js" defer></script>
+    <script src="scripts/db.js" defer></script>
     <script src="scripts/storage.js" defer></script>
     <script src="scripts/data-manager.js" defer></script>
     <script src="scripts/workspaces/store.js" defer></script>

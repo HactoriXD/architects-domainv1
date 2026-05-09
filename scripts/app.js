@@ -18,12 +18,20 @@
 // Initialize
     // ============================================
     async function init() {
-        loadChats();
-        loadMemories();
+        // Open IndexedDB; if unavailable, fall back to in-memory-only (no persistence)
+        try { await db.open(); } catch (e) { console.warn('IndexedDB unavailable — running without persistence'); }
+
+        // One-time migration from localStorage to IndexedDB
+        try { await migrateLocalStorageToIDB(); } catch (e) { console.warn('IDB migration failed:', e); }
+
+        // Load data from IndexedDB (or empty if unavailable)
+        try { await loadChats(); } catch (e) { state.chats = {}; }
+        try { await loadMemories(); } catch (e) { state.memories = []; }
         initMcpRegistry();
-        loadMcpServers();
+        try { await loadMcpServers(); } catch (e) { state.mcpServers = []; }
+        try { await loadMcpOperationalState(); } catch (e) { state.mcpLogs = []; state.mcpChatState = {}; }
         loadSettings();
-        loadWorkspaces();
+        try { await loadWorkspaces(); } catch (e) { state.workspaces = {}; }
         initEventListeners();
         initLightbox();
         initWorkspacesUi();

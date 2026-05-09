@@ -86,6 +86,7 @@
         saveChats();
         saveWorkspaces();
         updateContextInspector();
+        if (typeof renderMcpComposerIndicator === 'function') renderMcpComposerIndicator();
         renderWorkspaceUi();
         return id;
     }
@@ -116,6 +117,7 @@
         renderChatList();
         updateStats();
         updateContextInspector();
+        if (typeof renderMcpComposerIndicator === 'function') renderMcpComposerIndicator();
         closeSidebar();
     }
 

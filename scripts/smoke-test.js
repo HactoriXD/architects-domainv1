@@ -50,7 +50,9 @@ async function main() {
       'scripts/data-manager.js',
       'scripts/workspaces/store.js',
       'scripts/mcp/runtime.js',
-      'mcpExecutionList'
+      'mcpControlCenterBtn',
+      'mcpControlCenterModal',
+      'mcpToolInspector'
     ];
     requiredText.forEach(text => assert(html.includes(text), `Missing "${text}" in index.html`));
 
@@ -64,10 +66,13 @@ async function main() {
     const apiResponse = await fetch(`${baseUrl}/api/test`);
     assert(apiResponse.status === 410, 'Expected /api/* to return 410');
 
+    const runtimeConfigResponse = await fetch(`${baseUrl}/mcp-config.json`);
+    assert(runtimeConfigResponse.status === 403, 'Expected runtime MCP config file to be blocked by static server');
+
     const bridgeHealth = await fetch(`${baseUrl}/bridge/health`);
     assert(bridgeHealth.ok, 'Expected /bridge/health to return 200');
     const bridgeJson = await bridgeHealth.json();
-    assert(bridgeJson.ok && bridgeJson.presets.includes('filesystem'), 'Bridge health missing filesystem preset');
+    assert(bridgeJson.ok && bridgeJson.presets.includes('filesystem') && bridgeJson.presets.includes('git') && bridgeJson.presets.includes('app-inspector'), 'Bridge health missing core cockpit presets');
 
     const bridgeTest = await fetch(`${baseUrl}/bridge/servers/test`, {
       method: 'POST',
@@ -75,6 +80,38 @@ async function main() {
       body: JSON.stringify({ server: { type: 'filesystem', config: { root } } })
     });
     assert(bridgeTest.ok, 'Expected filesystem bridge test to pass');
+
+    const mcpStatus = await fetch(`${baseUrl}/mcp/status`);
+    assert(mcpStatus.ok, 'Expected /mcp/status to return 200');
+    const mcpStatusJson = await mcpStatus.json();
+    assert(mcpStatusJson.success && mcpStatusJson.servers.some(server => server.type === 'memory'), 'MCP status missing built-in servers');
+
+    const mcpTools = await fetch(`${baseUrl}/mcp/tools/all`);
+    assert(mcpTools.ok, 'Expected /mcp/tools/all to return 200');
+
+    const mcpError = await fetch(`${baseUrl}/mcp/filesystem/read_file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: path.resolve(root, '..', 'package.json') })
+    });
+    assert(mcpError.status >= 400, 'Expected disallowed MCP filesystem read to fail');
+    const mcpErrorJson = await mcpError.json();
+    assert(mcpErrorJson.success === false && mcpErrorJson.error?.code, 'Expected structured MCP error response');
+
+    const browserReset = await fetch(`${baseUrl}/mcp/browser/session/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    assert(browserReset.ok, 'Expected MCP browser session reset to pass');
+    const browserScreenshot = await fetch(`${baseUrl}/mcp/browser/browser_screenshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: baseUrl, fullPage: false })
+    });
+    assert(browserScreenshot.ok, 'Expected MCP browser screenshot to pass');
+    const screenshotJson = await browserScreenshot.json();
+    assert(screenshotJson.result?.screenshotBase64?.length > 100, 'Expected browser screenshot base64 output');
 
     const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
     assert(!serverSource.includes('Architectâ'), 'Server contains mojibake text');

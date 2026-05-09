@@ -53,6 +53,39 @@
         if (el.mcpServerConfig) el.mcpServerConfig.value = '';
     }
 
+    function addRecommendedMcpServer(type, options = {}) {
+        const preset = getMcpPreset(type);
+        if (!preset) return null;
+        const existing = getWorkspaceMcpServers().find(server => server.type === type);
+        if (existing) return existing;
+        const server = createMcpServer({
+            type,
+            name: preset.defaultName,
+            endpoint: preset.defaultEndpoint,
+            config: preset.defaultConfig ? preset.defaultConfig() : {}
+        });
+        state.mcpServers.push(server);
+        syncWorkspaceForMcpServer(server);
+        saveMcpServers();
+        renderMcpServers();
+        updateContextInspector();
+        if (options.fillForm) fillMcpFormFromPreset(preset);
+        return server;
+    }
+
+    async function testRecommendedMcpServer(type) {
+        const server = addRecommendedMcpServer(type);
+        if (server) await testMcpServer(server.id);
+        renderRecommendedMcpCards();
+    }
+
+    function fillMcpFormFromPreset(preset) {
+        el.mcpServerType.value = preset.type;
+        el.mcpServerName.value = preset.defaultName;
+        el.mcpServerEndpoint.value = preset.defaultEndpoint || '';
+        if (el.mcpServerConfig) el.mcpServerConfig.value = JSON.stringify(preset.defaultConfig ? preset.defaultConfig() : {}, null, 2);
+    }
+
     function parseMcpConfigInput() {
         const raw = el.mcpServerConfig?.value.trim();
         if (!raw) return {};
@@ -88,9 +121,14 @@
     async function testMcpServer(id) {
         const server = updateMcpServer(id, { status: 'testing', lastError: '' });
         if (!server) return;
+        if (['filesystem', 'browser', 'memory'].includes(server.type)) {
+            server.transport = 'mcp-system';
+            server.endpoint = location.protocol === 'file:' ? '' : `${location.origin}/mcp`;
+        }
         try {
             const result = await mcpRuntimeConnect(server);
             updateMcpServer(id, {
+                enabled: Boolean(server.enabled),
                 status: 'connected',
                 capabilities: result.capabilities,
                 resources: result.resources || [],

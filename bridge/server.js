@@ -1,6 +1,12 @@
 const path = require('path');
 const { getFilesystemAdapter, testFilesystem, callFilesystemTool, listFilesystemResources, readFilesystemResource } = require('./adapters/filesystem');
 const { getGithubAdapter, testGithub, callGithubTool, listGithubResources, readGithubResource } = require('./adapters/github');
+const { getGitAdapter, testGit, callGitTool, listGitResources, readGitResource } = require('./adapters/git');
+const { getAppInspectorAdapter, testAppInspector, callAppInspectorTool, listAppInspectorResources, readAppInspectorResource } = require('./adapters/app-inspector');
+const { getBridgeHealthAdapter, testBridgeHealth, callBridgeHealthTool, listBridgeHealthResources, readBridgeHealthResource } = require('./adapters/bridge-health');
+const { getWebFetchPlusAdapter, testWebFetchPlus, callWebFetchPlusTool, listWebFetchPlusResources, readWebFetchPlusResource } = require('./adapters/web-fetch-plus');
+const { getNotesVaultAdapter, testNotesVault, callNotesVaultTool, listNotesVaultResources, readNotesVaultResource } = require('./adapters/notes-vault');
+const { handleMcpSystemRequest } = require('./mcp-system');
 
 const REQUEST_LIMIT = 1024 * 1024;
 
@@ -31,6 +37,41 @@ const ADAPTERS = {
     listResources: listGithubResources,
     readResource: readGithubResource
   },
+  git: {
+    meta: getGitAdapter,
+    test: testGit,
+    call: callGitTool,
+    listResources: listGitResources,
+    readResource: readGitResource
+  },
+  'app-inspector': {
+    meta: getAppInspectorAdapter,
+    test: testAppInspector,
+    call: callAppInspectorTool,
+    listResources: listAppInspectorResources,
+    readResource: readAppInspectorResource
+  },
+  'bridge-health': {
+    meta: getBridgeHealthAdapter,
+    test: testBridgeHealth,
+    call: callBridgeHealthTool,
+    listResources: listBridgeHealthResources,
+    readResource: readBridgeHealthResource
+  },
+  'web-fetch-plus': {
+    meta: getWebFetchPlusAdapter,
+    test: testWebFetchPlus,
+    call: callWebFetchPlusTool,
+    listResources: listWebFetchPlusResources,
+    readResource: readWebFetchPlusResource
+  },
+  'notes-vault': {
+    meta: getNotesVaultAdapter,
+    test: testNotesVault,
+    call: callNotesVaultTool,
+    listResources: listNotesVaultResources,
+    readResource: readNotesVaultResource
+  },
   'web-fetch': {
     meta: () => ({
       type: 'web-fetch',
@@ -56,6 +97,9 @@ const ADAPTERS = {
 };
 
 async function handleBridgeRequest(req, res, url) {
+  if (await handleMcpSystemRequest(req, res, url, { sendJson })) {
+    return true;
+  }
   if (req.method === 'OPTIONS') {
     sendJson(res, 204, {});
     return true;
@@ -170,7 +214,7 @@ function getAdapter(server = {}) {
 
 function getServerConfig(server = {}) {
   const config = typeof server.config === 'object' && server.config ? server.config : {};
-  if (server.type === 'filesystem' || server.type === 'markdown-vault') {
+  if (['filesystem', 'markdown-vault', 'git', 'app-inspector', 'notes-vault'].includes(server.type)) {
     return { ...config, root: config.root || path.resolve(process.cwd()) };
   }
   return config;
@@ -202,7 +246,7 @@ function sendJson(res, status, payload) {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization'
   });
   if (status === 204) res.end();

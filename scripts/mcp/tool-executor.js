@@ -31,7 +31,7 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
     renderMcpExecutionCards();
     updateContextInspector();
 
-    if (requiresMcpApproval(tool) && !requestMcpToolApproval(tool, args)) {
+    if (requiresMcpApproval(tool) && !(await requestMcpToolApproval(tool, args))) {
         execution.status = 'cancelled';
         execution.finishedAt = Date.now();
         execution.error = 'User rejected tool call';
@@ -47,7 +47,30 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
     renderMcpExecutionCards();
 
     try {
-        const result = await mcpRuntimeCallTool(server, tool.name, args, { signal: controller.signal });
+        if (typeof logMcpEvent === 'function') await logMcpEvent({ eventType: 'execution', serverId: server.id, serverName: server.name, toolName: tool.name, success: true, message: `${tool.name} started` });
+        let result = await mcpRuntimeCallTool(server, tool.name, args, { signal: controller.signal });
+        if (result?.requiresConfirmation) {
+            if (!result.operationId) {
+                execution.status = 'failed';
+                execution.finishedAt = Date.now();
+                execution.error = 'Confirmation required but no operation ID received';
+                return execution;
+            }
+            const preview = result.preview ? `\n\nPreview:\n${String(result.preview).slice(0, 400)}` : '';
+            const pathInfo = result.path ? `\n\nPath: ${result.path}` : '';
+            const allowed = await requestMcpToolApproval({ ...tool, safety: 'destructive', permission: { ...(tool.permission || {}), riskLevel: 'destructive', requiresApproval: true } }, { ...args, operationId: result.operationId, path: result.path, preview: result.preview }, { force: true });
+            if (!allowed) {
+                execution.status = 'cancelled';
+                execution.finishedAt = Date.now();
+                execution.error = 'User rejected confirmation';
+                return execution;
+            }
+            result = await confirmMcpSystemOperation(server.type, result.operationId);
+            result = result.result ?? result;
+        }
+        if (result?.requiresFrontendExtraction && tool.name === 'browser_extract_structured') {
+            result = await extractStructuredMcpResult(result, args);
+        }
         execution.status = 'success';
         execution.result = result;
         execution.finishedAt = Date.now();
@@ -55,6 +78,8 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
         server.executionHistory = [execution, ...(server.executionHistory || [])].slice(0, 20);
         server.lastSeenAt = Date.now();
         server.status = 'connected';
+        if (typeof markToolUsage === 'function') markToolUsage(server, tool.name, true);
+        if (typeof logMcpEvent === 'function') await logMcpEvent({ eventType: 'execution', serverId: server.id, serverName: server.name, toolName: tool.name, durationMs: execution.elapsedMs, success: true, message: `${tool.name} succeeded` });
     } catch (error) {
         execution.status = error.name === 'AbortError' ? 'timeout' : 'failed';
         execution.error = error.name === 'AbortError' ? 'Tool call timed out' : (error.message || 'Tool call failed');
@@ -62,6 +87,8 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
         execution.elapsedMs = execution.startedAt ? execution.finishedAt - execution.startedAt : 0;
         server.status = execution.status === 'timeout' ? 'timeout' : 'degraded';
         server.lastError = execution.error;
+        if (typeof markToolUsage === 'function') markToolUsage(server, tool.name, false);
+        if (typeof logMcpEvent === 'function') await logMcpEvent({ eventType: 'error', serverId: server.id, serverName: server.name, toolName: tool.name, durationMs: execution.elapsedMs, success: false, message: `${tool.name} failed`, details: { error: execution.error } });
     } finally {
         clearTimeout(timeout);
         saveMcpServers();
@@ -73,14 +100,52 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
     return execution;
 }
 
+async function extractStructuredMcpResult(extracted, args = {}) {
+    if (!state.selectedModel || !getApiKey()) {
+        return { ...extracted, extractionError: 'Structured extraction requires the active provider and API key.' };
+    }
+    const schema = args.schema && typeof args.schema === 'object' ? args.schema : {};
+    const response = await fetch(`${getProvider().apiBase}/chat/completions`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+            model: state.selectedModel.id,
+            temperature: 0,
+            stream: false,
+            messages: [
+                { role: 'system', content: 'Extract JSON from page text. Return only valid JSON matching the requested schema. Do not include markdown.' },
+                { role: 'user', content: `Schema:\n${JSON.stringify(schema, null, 2)}\n\nPage title: ${extracted.title || ''}\nURL: ${extracted.url || ''}\n\nText:\n${String(extracted.text || '').slice(0, 50000)}` }
+            ]
+        })
+    });
+    if (!response.ok) throw new Error(await parseApiError(response));
+    const payload = await response.json();
+    const content = payload.choices?.[0]?.message?.content || '{}';
+    let structured = null;
+    try {
+        structured = JSON.parse(content);
+    } catch (error) {
+        structured = { raw: content };
+    }
+    return { url: extracted.url, title: extracted.title, schema, structured };
+}
+
 function buildToolResultApiMessage(execution) {
+    let content;
+    if (execution.status === 'success') {
+        if (execution.result && typeof execution.result === 'object' && execution.result.requiresConfirmation) {
+            content = `MCP tool ${execution.toolName} requires confirmation before completing. The operation has not been executed yet.`;
+        } else {
+            content = sanitizeMcpToolResult(execution.result);
+        }
+    } else {
+        content = `MCP tool ${execution.toolName} ${execution.status}: ${execution.error || 'No result'}`;
+    }
     return {
         role: 'tool',
         tool_call_id: execution.providerToolCallId || execution.id,
         name: mcpToolNameToProviderName(execution.qualifiedName),
-        content: execution.status === 'success'
-            ? sanitizeMcpToolResult(execution.result)
-            : `MCP tool ${execution.toolName} ${execution.status}: ${execution.error || 'No result'}`
+        content
     };
 }
 
