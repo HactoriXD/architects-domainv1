@@ -51,6 +51,9 @@ async function main() {
 
   const app = await testAppInspector({ root });
   assert(app.tools.some(tool => tool.name === 'app.health'), 'App inspector tools missing');
+  assert(app.tools.some(tool => tool.name === 'app_get_screen_summary'), 'App screen summary tool missing');
+  assert(app.tools.some(tool => tool.name === 'app_run_smoke_tour'), 'App smoke tour tool missing');
+  assert(app.tools.some(tool => tool.name === 'app_screenshot_region'), 'App screenshot region tool missing');
   const appHealth = await callAppInspectorTool({ root }, 'app.health');
   assert(appHealth.requiredFiles.some(file => file.name === 'index.html' && file.exists), 'App health missing index.html');
 

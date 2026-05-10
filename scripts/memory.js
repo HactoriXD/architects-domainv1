@@ -21,6 +21,9 @@
     ]);
 
     const MEMORY_SPECIFIC_OBJECTS = /\b(pizza|league|league of legends|minecraft|github|javascript|typescript|python|react|vue|svelte|node|cats?|dogs?|wife|husband|partner|girlfriend|boyfriend|friend|mother|father|sister|brother|son|daughter|project|app|game|website|business|startup|school|college|university|job|career|music|guitar|piano|drawing|writing|fitness|gym|language|english|romanian|bucharest|romania)\b/i;
+    const MEMORY_SUPPRESSIONS_KEY = 'architects_domain_memory_suppressions';
+    const MEMORY_SUPPRESSION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+    const MEMORY_LANGUAGE_NAMES = ['romanian', 'english', 'italian', 'french', 'spanish', 'german', 'portuguese', 'latin'];
 
     function normalizeMemoryCategory(category) {
         const normalized = MEMORY_CATEGORY_ALIASES[category] || category;
@@ -28,47 +31,204 @@
     }
 
     function memoryExists(content) {
-        const normalized = String(content || '').trim().toLowerCase();
-        return state.memories.some(memory => memory.content.trim().toLowerCase() === normalized && memory.workspaceId === state.activeWorkspaceId)
-            || state.memorySuggestions.some(suggestion => suggestion.content.trim().toLowerCase() === normalized && suggestion.workspaceId === state.activeWorkspaceId);
+        return memoryDuplicateCheck(
+            { content, workspaceId: state.activeWorkspaceId },
+            state.memories,
+            state.memorySuggestions
+        ).duplicate;
+    }
+
+    function normalizeMemoryText(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/\u2019/g, "'")
+            .replace(/[^a-z0-9%]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function extractMemoryContent(entry) {
+        return String(entry?.content || entry?.text || entry || '').trim();
+    }
+
+    function canonicalMemoryKey(entry) {
+        const content = normalizeMemoryText(extractMemoryContent(entry));
+        if (!content) return '';
+
+        const nameMatch = content.match(/^(?:hi\s+)?(?:user s name is|user name is|user identifies as|the user is called|user is called|my name is|i m|i am)\s+([a-z][a-z0-9]*(?:\s+[a-z][a-z0-9]*)?)$/);
+        if (nameMatch && !isTransientIdentityFragment(nameMatch[1])) return `identity:name:${nameMatch[1]}`;
+
+        const preferredNameMatch = content.match(/^(?:user prefers to be called|user preferred name is|user goes by|call me|please call me)\s+([a-z][a-z0-9]*(?:\s+[a-z][a-z0-9]*)?)$/);
+        if (preferredNameMatch) return `identity:preferred-name:${preferredNameMatch[1]}`;
+
+        const nicknameMatch = content.match(/^(?:user s nickname is|user nickname is|my nickname is)\s+([a-z][a-z0-9]*(?:\s+[a-z][a-z0-9]*)?)$/);
+        if (nicknameMatch) return `identity:nickname:${nicknameMatch[1]}`;
+
+        const languages = extractLanguageNames(content);
+        if (languages.length && /\b(speaks?|languages?|strongest|fluent|romanian|english|italian|french|spanish|german|portuguese|latin)\b/.test(content)) {
+            const detail = /\b(strongest|fluent|native|around|about|roughly|\d{1,3}%|percent|level)\b/.test(content) ? `:${content}` : '';
+            return `profile:languages:${languages.join(',')}${detail}`;
+        }
+
+        const preferenceMatch = content.match(/^user (likes|loves|enjoys|prefers|dislikes|hates|plays)\s+(.+)$/);
+        if (preferenceMatch) return `preference:${preferenceMatch[1]}:${preferenceMatch[2]}`;
+
+        if (/\barchitects? domain\b/.test(content) && /\b(project|app|workspace|working|building|fix|memory)\b/.test(content)) {
+            return `project:architects-domain:${content.replace(/\barchitects? domain\b/g, 'architects domain')}`;
+        }
+
+        if (/\b(bac|baccalaureate|exam|study|studying|subject|subjects)\b/.test(content)) {
+            const bacSubjects = ['romanian', 'math', 'mathematics', 'history', 'biology', 'chemistry', 'physics', 'informatics', 'logic', 'geography'].filter(subject => content.includes(subject));
+            return `goal:bac:${bacSubjects.length ? bacSubjects.join(',') : content}`;
+        }
+
+        return `text:${content}`;
+    }
+
+    function extractLanguageNames(text) {
+        const content = normalizeMemoryText(text);
+        return MEMORY_LANGUAGE_NAMES.filter(language => new RegExp(`\\b${language}\\b`, 'i').test(content)).sort();
+    }
+
+    function isTransientIdentityFragment(value) {
+        return /^(?:working|playing|trying|using|feeling|tired|hungry|bored|sad|happy|sick|busy|here|online|eating|drinking|going|leaving|good|nice|cool|ok|okay|fine|great|awesome|bad)\b/i.test(String(value || '').trim());
+    }
+
+    function loadMemorySuppressions() {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(MEMORY_SUPPRESSIONS_KEY) || '[]');
+            return Array.isArray(parsed) ? parsed.filter(item => item && item.canonicalKey && Number(item.cooldownUntil) > Date.now()) : [];
+        } catch (error) {
+            console.warn('Memory suppression load failed:', error.message || error);
+            return [];
+        }
+    }
+
+    function saveMemorySuppressions(records) {
+        try {
+            localStorage.setItem(MEMORY_SUPPRESSIONS_KEY, JSON.stringify(records.slice(-100)));
+        } catch (error) {
+            console.warn('Memory suppression save failed:', error.message || error);
+        }
+    }
+
+    function isMemorySuppressed(canonicalKey) {
+        if (!canonicalKey) return false;
+        const active = loadMemorySuppressions();
+        if (active.length) saveMemorySuppressions(active);
+        return active.some(item => item.canonicalKey === canonicalKey);
+    }
+
+    function suppressMemorySuggestion(suggestion, reason = 'rejected') {
+        const canonicalKey = suggestion?.canonicalKey || canonicalMemoryKey(suggestion);
+        if (!canonicalKey) return;
+        const now = Date.now();
+        const active = loadMemorySuppressions().filter(item => item.canonicalKey !== canonicalKey);
+        active.push({
+            canonicalKey,
+            rejectedAt: now,
+            cooldownUntil: now + MEMORY_SUPPRESSION_COOLDOWN_MS,
+            reason
+        });
+        saveMemorySuppressions(active);
+    }
+
+    function memoryDuplicateCheck(candidate, existingMemories = [], pendingSuggestions = []) {
+        const candidateWorkspace = candidate?.workspaceId || state.activeWorkspaceId;
+        const canonicalKey = candidate?.canonicalKey || canonicalMemoryKey(candidate);
+        if (!canonicalKey) return { duplicate: false };
+        if (isMemorySuppressed(canonicalKey)) return { duplicate: true, reason: 'suppressed' };
+
+        const sameWorkspace = item => !item?.workspaceId || !candidateWorkspace || item.workspaceId === candidateWorkspace;
+        const matches = item => sameWorkspace(item) && (item.canonicalKey || canonicalMemoryKey(item)) === canonicalKey;
+        const existing = existingMemories.find(matches);
+        if (existing) return { duplicate: true, existingMemoryId: existing.id, reason: 'approved_memory' };
+        const pending = pendingSuggestions.find(matches);
+        if (pending) return { duplicate: true, existingMemoryId: pending.id, reason: 'pending_suggestion' };
+        return { duplicate: false };
+    }
+
+    function findRelatedLanguageMemory(candidate) {
+        const candidateLanguages = extractLanguageNames(candidate?.content);
+        if (!candidateLanguages.length) return null;
+        return state.memories.find(memory => {
+            if (memory.workspaceId !== state.activeWorkspaceId) return false;
+            const existingLanguages = extractLanguageNames(memory.content || memory.text);
+            return existingLanguages.length && candidateLanguages.some(language => existingLanguages.includes(language));
+        }) || null;
+    }
+
+    function buildLanguageUpdateSuggestion(candidate, existingMemory) {
+        const content = extractMemoryContent(candidate);
+        if (!existingMemory || !/\b(strongest|fluent|native|around|about|roughly|\d{1,3}%|percent|level)\b/i.test(content)) return null;
+        const detail = cleanMemoryFragment(content
+            .replace(/^user\s+(?:speaks|language note:)\s*/i, '')
+            .replace(/\.$/, ''));
+        const existing = extractMemoryContent(existingMemory).replace(/[.!?]+$/g, '');
+        return normalizeMemoryPhrase(`Update existing memory: ${existing}. ${detail}.`);
     }
 
     function extractMemorySuggestionsFromText(text, sourceMessage) {
-        const source = String(text || '').trim();
-        if (!source || source.length > 600) return [];
-        const rules = [
-            { pattern: /\bmy name is\s+([A-Z][\w'-]{1,40}(?:\s+[A-Z][\w'-]{1,40})?)/i, category: 'identity', build: m => `User's name is ${m[1].trim()}.`, confidence: 0.94 },
-            { pattern: /\bi(?:'m| am)\s+([a-z][\w\s'-]{2,80})/i, category: 'identity', build: m => `User identifies as ${cleanMemoryFragment(m[1])}.`, confidence: 0.72 },
-            { pattern: /\bi (?:like|love|enjoy|prefer)\s+([^.!?\n]{2,100})/i, category: 'preference', build: m => `User likes ${cleanMemoryFragment(m[1])}.`, confidence: 0.78 },
-            { pattern: /\bi (?:play|play a lot of|am playing)\s+([^.!?\n]{2,100})/i, category: 'preference', build: m => `User plays ${cleanMemoryFragment(m[1])}.`, confidence: 0.78 },
-            { pattern: /\bi (?:hate|dislike|don't like|do not like)\s+([^.!?\n]{2,100})/i, category: 'preference', build: m => `User dislikes ${cleanMemoryFragment(m[1])}.`, confidence: 0.78 },
-            { pattern: /\bi have\s+([^.!?\n]{2,100})/i, category: 'relationship', build: m => classifyHaveMemory(m[1]), confidence: 0.7 },
-            { pattern: /\bmy (?:wife|husband|partner|girlfriend|boyfriend|friend|mother|father|sister|brother|cat|dog)\s+is\s+([^.!?\n]{2,100})/i, category: 'relationship', build: m => `User relationship note: ${cleanMemoryFragment(m[0])}.`, confidence: 0.76 },
-            { pattern: /\bi(?:'m| am) working on\s+([^.!?\n]{2,120})/i, category: 'project', build: m => `User is working on ${cleanMemoryFragment(m[1])}.`, confidence: 0.82 },
-            { pattern: /\bmy project is\s+([^.!?\n]{2,120})/i, category: 'project', build: m => `User project: ${cleanMemoryFragment(m[1])}.`, confidence: 0.82 },
-            { pattern: /\bi want to\s+([^.!?\n]{2,120})/i, category: 'goal', build: m => `User wants to ${cleanMemoryFragment(m[1])}.`, confidence: 0.68 },
-            { pattern: /\bmy goal is to\s+([^.!?\n]{2,120})/i, category: 'goal', build: m => `User goal: ${cleanMemoryFragment(m[1])}.`, confidence: 0.84 }
-        ];
+        try {
+            const source = String(text || '').trim();
+            if (!source || source.length > 600 || isTrivialMemoryMessage(source)) return [];
+            const rules = [
+                { pattern: /\bmy name is\s+([A-Z][\w'-]{1,40}(?:\s+[A-Z][\w'-]{1,40})?)/i, category: 'identity', build: m => `User's name is ${m[1].trim()}.`, confidence: 0.94 },
+                { pattern: /\b(?:the user is called|user is called|call me|please call me)\s+([A-Z][\w'-]{1,40}(?:\s+[A-Z][\w'-]{1,40})?)/i, category: 'identity', build: m => `User's name is ${m[1].trim()}.`, confidence: 0.9 },
+                { pattern: /\bmy (?:preferred name|nickname) is\s+([A-Z][\w'-]{1,40}(?:\s+[A-Z][\w'-]{1,40})?)/i, category: 'identity', build: m => `User's nickname is ${m[1].trim()}.`, confidence: 0.88 },
+                { pattern: /\bi(?:'m| am)\s+([a-z][\w\s'-]{2,80})/i, category: 'identity', build: m => `User identifies as ${cleanMemoryFragment(m[1])}.`, confidence: 0.72 },
+                { pattern: /\b((?:english|romanian|italian|french|spanish|german|portuguese|latin)(?:\s*(?:,|and)\s*(?:english|romanian|italian|french|spanish|german|portuguese|latin))*)\s+are\s+my\s+([^.!?\n]{2,120})/i, category: 'identity', build: m => `User language note: ${cleanMemoryFragment(m[0])}.`, confidence: 0.86 },
+                { pattern: /\bi\s+speak\s+([^.!?\n]{2,120})/i, category: 'identity', build: m => `User speaks ${cleanMemoryFragment(m[1])}.`, confidence: 0.84 },
+                { pattern: /\bi (?:like|love|enjoy|prefer)\s+([^.!?\n]{2,100})/i, category: 'preference', build: m => `User likes ${cleanMemoryFragment(m[1])}.`, confidence: 0.78 },
+                { pattern: /\bi (?:play|play a lot of|am playing)\s+([^.!?\n]{2,100})/i, category: 'preference', build: m => `User plays ${cleanMemoryFragment(m[1])}.`, confidence: 0.78 },
+                { pattern: /\bi (?:hate|dislike|don't like|do not like)\s+([^.!?\n]{2,100})/i, category: 'preference', build: m => `User dislikes ${cleanMemoryFragment(m[1])}.`, confidence: 0.78 },
+                { pattern: /\bi have\s+([^.!?\n]{2,100})/i, category: 'relationship', build: m => classifyHaveMemory(m[1]), confidence: 0.7 },
+                { pattern: /\bmy (?:wife|husband|partner|girlfriend|boyfriend|friend|mother|father|sister|brother|cat|dog)\s+is\s+([^.!?\n]{2,100})/i, category: 'relationship', build: m => `User relationship note: ${cleanMemoryFragment(m[0])}.`, confidence: 0.76 },
+                { pattern: /\bi(?:'m| am) working on\s+([^.!?\n]{2,120})/i, category: 'project', build: m => `User is working on ${cleanMemoryFragment(m[1])}.`, confidence: 0.82 },
+                { pattern: /\barchitect'?s domain\s+(?:is|needs|has|uses|will|should|must)\s+([^.!?\n]{2,120})/i, category: 'project', build: m => `Architect's Domain project fact: ${cleanMemoryFragment(m[0])}.`, confidence: 0.82 },
+                { pattern: /\bmy project is\s+([^.!?\n]{2,120})/i, category: 'project', build: m => `User project: ${cleanMemoryFragment(m[1])}.`, confidence: 0.82 },
+                { pattern: /\b(?:i am|i'm|i need to|i want to)\s+(?:study|prepare for|pass)\s+([^.!?\n]*(?:bac|baccalaureate|exam|romanian|math|mathematics|history|biology|chemistry|physics|informatics)[^.!?\n]*)/i, category: 'goal', build: m => `User study goal: ${cleanMemoryFragment(m[0])}.`, confidence: 0.82 },
+                { pattern: /\bi want to\s+([^.!?\n]{2,120})/i, category: 'goal', build: m => `User wants to ${cleanMemoryFragment(m[1])}.`, confidence: 0.68 },
+                { pattern: /\bmy goal is to\s+([^.!?\n]{2,120})/i, category: 'goal', build: m => `User goal: ${cleanMemoryFragment(m[1])}.`, confidence: 0.84 }
+            ];
 
-        const suggestions = [];
-        for (const rule of rules) {
-            const match = source.match(rule.pattern);
-            if (!match) continue;
-            const content = rule.build(match);
-            const evaluation = evaluateMemoryCandidate(content, rule.category);
-            if (!evaluation.allowed || memoryExists(evaluation.content)) continue;
-            suggestions.push({
-                id: generateId(),
-                content: evaluation.content,
-                category: evaluation.category,
-                confidence: Math.max(rule.confidence, evaluation.score),
-                sourceChat: state.currentChatId,
-                sourceMessage,
-                workspaceId: state.activeWorkspaceId,
-                createdAt: Date.now()
-            });
+            const suggestions = [];
+            for (const rule of rules) {
+                const match = source.match(rule.pattern);
+                if (!match) continue;
+                const content = rule.build(match);
+                const evaluation = evaluateMemoryCandidate(content, rule.category);
+                if (!evaluation.allowed) continue;
+                const candidate = {
+                    content: evaluation.content,
+                    category: evaluation.category,
+                    workspaceId: state.activeWorkspaceId
+                };
+                const relatedLanguageMemory = findRelatedLanguageMemory(candidate);
+                if (relatedLanguageMemory) {
+                    const updateContent = buildLanguageUpdateSuggestion(candidate, relatedLanguageMemory);
+                    if (updateContent) candidate.content = updateContent;
+                }
+                candidate.canonicalKey = canonicalMemoryKey(candidate);
+                const duplicate = memoryDuplicateCheck(candidate, state.memories, suggestions.concat(state.memorySuggestions));
+                if (duplicate.duplicate) continue;
+                suggestions.push({
+                    id: generateId(),
+                    content: candidate.content,
+                    category: evaluation.category,
+                    confidence: Math.max(rule.confidence, evaluation.score),
+                    sourceChat: state.currentChatId,
+                    sourceMessage,
+                    workspaceId: state.activeWorkspaceId,
+                    canonicalKey: candidate.canonicalKey,
+                    createdAt: Date.now()
+                });
+            }
+            return suggestions;
+        } catch (error) {
+            console.warn('Memory suggestion extraction failed:', error.message || error);
+            return [];
         }
-        return suggestions;
     }
 
     function evaluateMemoryCandidate(text, category) {
@@ -77,8 +237,9 @@
 
         const content = normalizeMemoryPhrase(text);
         const lowered = content.toLowerCase().replace(/[.!?]+$/g, '').trim();
+        if (isTrivialMemoryMessage(content)) return { allowed: false, score: 0, reason: 'trivial' };
         if (content.length < 8) return { allowed: false, score: 0, reason: 'too_short' };
-        if (/^(hi|hello|hey|ok|okay|yes|no|thanks|thank you|cool|nice|good)\b[.!?]*$/i.test(content)) {
+        if (/^(hi|hello|hey|ok|okay|yes|no|thanks|thank you|cool|nice|good|lol|go next)\b[.!?]*$/i.test(content)) {
             return { allowed: false, score: 0, reason: 'filler' };
         }
         if (/^user (?:is|likes|plays|has|wants)\s+(?:good|nice|cool|ok|okay|yes|fine|great|awesome|bad|stuff|things?|something|anything|it|this|that)\.?$/i.test(content)) {
@@ -93,17 +254,22 @@
         if (/^user identifies as\s+(?:working on|playing|trying|using|feeling|tired|hungry|bored|sad|happy|sick|busy|here|online|good|nice|cool|ok|okay|fine|great|awesome|bad)\b/i.test(content)) {
             return { allowed: false, score: 0, reason: 'transient_identity' };
         }
+        if (/^user identifies as\s+(?:eating|drinking|going|leaving|watching|reading|doing|making|having)\b/i.test(content)) {
+            return { allowed: false, score: 0, reason: 'temporary_state' };
+        }
 
         const fragment = lowered
-            .replace(/^user(?:'s name)? (?:is|likes|dislikes|plays|has|wants to|is working on|identifies as|project:|goal:|relationship note:)\s+/i, '')
+            .replace(/^user(?:'s name)? (?:is|likes|dislikes|plays|has|wants to|is working on|identifies as|project:|goal:|study goal:|relationship note:|speaks|language note:)\s+/i, '')
+            .replace(/^architect's domain project fact:\s+/i, '')
             .replace(/^user's name is\s+/i, '')
             .trim();
         if (!hasPersistentMeaning(content, fragment)) return { allowed: false, score: 0, reason: 'no_persistent_meaning' };
 
         let score = 0;
         if (/\b(User's name is|User identifies as|User is \d{1,3}\b|User lives in|User is from)\b/i.test(content)) score += 0.4;
+        if (/\bUser speaks\b|User language note:/i.test(content)) score += 0.5;
         if (/\bUser (?:likes|dislikes|plays|enjoys|prefers)\b/i.test(content) && hasSpecificObject(fragment)) score += 0.3;
-        if (/\b(User is working on|User project:|User goal:|User wants to|User has|User relationship note:)\b/i.test(content)) score += 0.3;
+        if (/\b(User is working on|User project:|User goal:|User study goal:|User wants to|User has|User relationship note:|Architect's Domain project fact:)\b/i.test(content)) score += 0.3;
         if (hasSpecificObject(fragment)) score += 0.3;
 
         score = Math.min(1, score);
@@ -115,6 +281,8 @@
     function normalizeMemoryPhrase(text) {
         const raw = String(text || '').replace(/\s+/g, ' ').trim();
         const withoutPeriod = raw.replace(/[.!?]+$/g, '').trim();
+        const calledMatch = withoutPeriod.match(/^(?:the user is called|user is called|call me|please call me)\s+(.+)$/i);
+        if (calledMatch) return `User's name is ${cleanMemoryFragment(calledMatch[1])}.`;
         const nameMatch = withoutPeriod.match(/^my name is\s+(.+)$/i);
         if (nameMatch) return `User's name is ${cleanMemoryFragment(nameMatch[1])}.`;
         const playMatch = withoutPeriod.match(/^(?:i\s+)?play\s+league$/i);
@@ -136,7 +304,17 @@
 
     function hasPersistentMeaning(content, fragment) {
         if (hasSpecificObject(content, fragment)) return true;
-        return /\b(User's name is|User identifies as|User has|User is working on|User wants to|User project:|User goal:)\b/i.test(content);
+        return /\b(User's name is|User identifies as|User has|User is working on|User wants to|User speaks)\b|User project:|User goal:|User study goal:|User language note:|Architect's Domain project fact:/i.test(content);
+    }
+
+    function isTrivialMemoryMessage(text) {
+        const normalized = normalizeMemoryText(text);
+        if (!normalized) return true;
+        if (/^(hi|hello|hey|ok|okay|lol|go next|yes|no|thanks|thank you|cool|nice|good)$/.test(normalized)) return true;
+        if (/^(i m|i am|user identifies as) (bored|tired|hungry|sad|happy|sick|busy|eating|drinking|going|leaving|here|online)(?:\s|$)/.test(normalized)) return true;
+        if (/\b(right now|today|tonight|this morning|this afternoon|currently|at the moment)\b/.test(normalized)
+            && /\b(eating|drinking|watching|reading|doing|going|leaving|playing|making|having)\b/.test(normalized)) return true;
+        return false;
     }
 
     function cleanMemoryFragment(value) {
@@ -158,11 +336,15 @@
 
     function queueMemorySuggestionsForMessage(message, messageIndex) {
         if (!message || message.role !== 'user') return;
-        const suggestions = extractMemorySuggestionsFromText(message.content, messageIndex);
-        if (!suggestions.length) return;
-        state.memorySuggestions.push(...suggestions);
-        renderMemorySuggestions();
-        updateContextInspector();
+        try {
+            const suggestions = extractMemorySuggestionsFromText(message.content, messageIndex);
+            if (!suggestions.length) return;
+            state.memorySuggestions.push(...suggestions);
+            renderMemorySuggestions();
+            updateContextInspector();
+        } catch (error) {
+            console.warn('Memory suggestion queue failed:', error.message || error);
+        }
     }
 
     function acceptMemorySuggestion(id) {
@@ -197,6 +379,8 @@
     }
 
     function rejectMemorySuggestion(id) {
+        const suggestion = state.memorySuggestions.find(item => item.id === id);
+        suppressMemorySuggestion(suggestion, 'rejected');
         state.memorySuggestions = state.memorySuggestions.filter(item => item.id !== id);
         renderMemorySuggestions();
     }

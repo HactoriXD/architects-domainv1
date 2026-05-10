@@ -79,7 +79,7 @@
         {
             type: 'app-inspector',
             label: 'App Self-Inspector',
-            description: 'Inspect app health, package scripts, runtime files, and project structure.',
+            description: 'Inspect app health, UI state, interactive elements, layout issues, console output, screenshots, and smoke-tour product surfaces.',
             defaultName: 'App Inspector',
             requiresBridge: true,
             recommended: true,

@@ -358,6 +358,28 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
         if (Array.isArray(result.entries)) {
             return `${execution.serverName} listed ${result.entries.length} project entries.`;
         }
+        if (result.screen && Array.isArray(result.visibleButtons)) {
+            return `${execution.serverName} summarized ${result.screen}: ${result.visibleButtons.length} visible buttons, ${result.visibleInputs?.length || 0} inputs.`;
+        }
+        if (Array.isArray(result.groups)) {
+            const count = result.groups.reduce((total, group) => total + (group.elements?.length || 0), 0);
+            return `${execution.serverName} found ${count} interactive elements across ${result.groups.length} regions.`;
+        }
+        if (Array.isArray(result.issues)) {
+            return `${execution.serverName} found ${result.issueCount || result.issues.length} layout issues.`;
+        }
+        if (Array.isArray(result.surfaces)) {
+            const passed = result.surfaces.filter(surface => surface.opened && surface.rendered && surface.closed).length;
+            return `${execution.serverName} smoke-tested ${result.surfaces.length} surfaces: ${passed} passed.`;
+        }
+        if (Array.isArray(result.consoleEntries)) {
+            return `${execution.serverName} returned ${result.count || result.consoleEntries.length} console issues.`;
+        }
+        if (typeof result.clicked === 'boolean') {
+            if (result.clicked) return `${execution.serverName} clicked "${result.match?.label || result.requestedText}".`;
+            if (result.requiresApproval) return `${execution.serverName} blocked a destructive click pending approval.`;
+            return `${execution.serverName} could not click "${result.requestedText || 'requested control'}": ${result.reason || 'no match'}.`;
+        }
         if (Array.isArray(result.notes)) {
             return `${execution.serverName} listed ${result.notes.length} notes.`;
         }
