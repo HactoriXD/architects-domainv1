@@ -5,7 +5,24 @@ const PROVIDERS = {
             defaultModel: CONFIG.DEFAULT_MODEL,
             supportsWebSearch: true,
             searchMode: 'openrouter-tool',
+            supportsNativeTools: true,
+            apiKeyLabel: 'OpenRouter API Key',
+            apiKeyPlaceholder: 'sk-or-...',
+            apiKeyHint: 'Used for OpenRouter model routing. Stored locally.',
             priority: ['anthropic', 'openai', 'google', 'meta', 'mistral']
+        },
+        groq: {
+            label: 'Groq',
+            badge: 'GroqCloud · OpenAI-compatible',
+            apiBase: 'https://api.groq.com/openai/v1',
+            defaultModel: 'llama-3.3-70b-versatile',
+            supportsWebSearch: false,
+            searchMode: 'none',
+            supportsNativeTools: false,
+            apiKeyLabel: 'Groq API Key',
+            apiKeyPlaceholder: 'gsk_...',
+            apiKeyHint: 'Used for GroqCloud\'s OpenAI-compatible endpoint. Stored locally.',
+            priority: ['llama-3.3', 'openai', 'qwen', 'meta-llama', 'groq']
         },
         deepseek: {
             label: 'DeepSeek',
@@ -13,6 +30,10 @@ const PROVIDERS = {
             defaultModel: 'deepseek-v4-flash',
             supportsWebSearch: false,
             searchMode: 'none',
+            supportsNativeTools: true,
+            apiKeyLabel: 'DeepSeek API Key',
+            apiKeyPlaceholder: 'sk-...',
+            apiKeyHint: 'Used for DeepSeek direct API requests. Stored locally.',
             priority: ['deepseek']
         },
         venice: {
@@ -21,9 +42,24 @@ const PROVIDERS = {
             defaultModel: 'venice-uncensored',
             supportsWebSearch: true,
             searchMode: 'venice-parameters',
+            supportsNativeTools: true,
+            apiKeyLabel: 'Venice API Key',
+            apiKeyPlaceholder: 'api key',
+            apiKeyHint: 'Used for Venice.ai direct API requests. Stored locally.',
             priority: ['venice', 'zai-org', 'deepseek', 'qwen', 'mistral', 'llama']
         }
     };
+
+    const GROQ_CURATED_MODELS = [
+        { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', context_length: 131072, max_completion_tokens: 32768, input_cost_per_1k_tokens: 0.00059, output_cost_per_1k_tokens: 0.00079, tags: ['fast', 'coding'], capabilities: { streaming: true, tools: false }, pricing_source: 'provider' },
+        { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', context_length: 131072, max_completion_tokens: 131072, input_cost_per_1k_tokens: 0.00005, output_cost_per_1k_tokens: 0.00008, tags: ['fast'], capabilities: { streaming: true, tools: false }, pricing_source: 'provider' },
+        { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B', context_length: 131072, max_completion_tokens: 65536, input_cost_per_1k_tokens: 0.00015, output_cost_per_1k_tokens: 0.00060, tags: ['fast', 'reasoning', 'coding'], capabilities: { streaming: true, tools: false }, pricing_source: 'provider' },
+        { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B', context_length: 131072, max_completion_tokens: 65536, input_cost_per_1k_tokens: 0.000075, output_cost_per_1k_tokens: 0.00030, tags: ['fast', 'reasoning'], capabilities: { streaming: true, tools: false }, pricing_source: 'provider' },
+        { id: 'qwen/qwen3-32b', name: 'Qwen3 32B', context_length: 131072, max_completion_tokens: 40960, input_cost_per_1k_tokens: 0.00029, output_cost_per_1k_tokens: 0.00059, tags: ['reasoning', 'coding'], capabilities: { streaming: true, tools: false }, pricing_source: 'provider' },
+        { id: 'meta-llama/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B 16E', context_length: 131072, max_completion_tokens: 8192, input_cost_per_1k_tokens: 0.00011, output_cost_per_1k_tokens: 0.00034, tags: ['fast', 'preview'], capabilities: { streaming: true, tools: false }, pricing_source: 'provider' },
+        { id: 'groq/compound', name: 'Groq Compound', context_length: 131072, max_completion_tokens: 8192, tags: ['fast'], capabilities: { streaming: true, tools: false }, pricing_note: 'Provider pricing' },
+        { id: 'groq/compound-mini', name: 'Groq Compound Mini', context_length: 131072, max_completion_tokens: 8192, tags: ['fast'], capabilities: { streaming: true, tools: false }, pricing_note: 'Provider pricing' }
+    ];
 
 // Model Management
     // ============================================
@@ -40,15 +76,44 @@ const PROVIDERS = {
         }
     }
 
+    function mergeProviderModelsWithCurated(providerId, models = []) {
+        if (providerId !== 'groq') return models;
+        const byId = new Map(GROQ_CURATED_MODELS.map(model => [model.id, { ...model }]));
+        for (const model of models) {
+            if (!model?.id) continue;
+            byId.set(model.id, { ...(byId.get(model.id) || {}), ...model });
+        }
+        return [...byId.values()];
+    }
+
     async function fetchModels() {
         const provider = getProvider();
         try {
             el.selectedModelName.textContent = `Loading ${provider.label}...`;
             el.modelList.innerHTML = '<div class="loading-models"><div class="spinner"></div><span>Loading models...</span></div>';
+            if (!getApiKey() && state.provider !== 'openrouter') {
+                state.models = buildFallbackModels(state.provider);
+                state.modelCategories.roleplay = new Set();
+                state.modelCategories.coding = new Set();
+                const savedId = state.selectedModel?.provider === state.provider ? state.selectedModel.id : loadSettings();
+                const model = state.models.find(m => m.id === savedId) || state.models.find(m => m.id === provider.defaultModel) || state.models[0];
+                if (model) selectModel(model);
+                else {
+                    state.selectedModel = null;
+                    el.selectedModelName.textContent = 'No models';
+                }
+                renderModelList(state.models);
+                setProviderStatus(state.provider, 'missing');
+                const missingCopy = state.provider === 'groq'
+                    ? 'Add Groq API key to fetch live availability. Showing curated Groq models.'
+                    : `Add ${provider.label} API key to fetch live availability. Showing local fallback models.`;
+                el.modelList.insertAdjacentHTML('afterbegin', `<div class="loading-models provider-empty-state">${missingCopy}</div>`);
+                return;
+            }
             const response = await fetch(`${provider.apiBase}/models`, { headers: getAuthHeaders(false) });
             if (!response.ok) throw new Error('Failed to fetch models');
             const data = await response.json();
-            state.models = (data.data || []).map(m => normalizeModel(state.provider, m)).filter(m => m.id).sort((a, b) => {
+            state.models = mergeProviderModelsWithCurated(state.provider, data.data || []).map(m => normalizeModel(state.provider, m)).filter(m => m.id).sort((a, b) => {
                 const priority = provider.priority || [];
                 const aP = priority.indexOf(a.id.split('/')[0]), bP = priority.indexOf(b.id.split('/')[0]);
                 if (aP !== -1 && bP !== -1) return aP - bP;
@@ -101,16 +166,19 @@ const PROVIDERS = {
             const traits = getModelTraits(m);
             const modelId = escapeHtml(m.id);
             const modelName = escapeHtml(m.name || m.id);
+            const providerBadge = state.provider === 'groq' ? '<span class="model-badge groq">GroqCloud</span>' : '';
             const badges = [
                 traits.free ? '<span class="model-badge free">Free</span>' : (state.provider === 'openrouter' ? '<span class="model-badge paid">Paid</span>' : ''),
+                providerBadge,
                 traits.vision ? '<span class="model-badge vision">Vision</span>' : '',
                 traits.reasoning ? '<span class="model-badge reasoning">Reasoning</span>' : '',
                 traits.coding ? '<span class="model-badge coding">Coding</span>' : '',
                 traits.roleplay ? '<span class="model-badge roleplay">Roleplay</span>' : ''
             ].join('');
+            const displayCostMeta = oneMessageCost === 'Provider pricing' ? 'Provider pricing' : `${oneMessageCost}/1K+1K`;
             return `<div class="model-item ${state.selectedModel?.id === m.id ? 'selected' : ''}" data-model-id="${modelId}">
                 <div class="model-item-header"><div class="model-item-name"><span>${modelName}</span>${badges}</div><span class="model-item-context">${ctx} ctx</span></div>
-                <div class="model-item-meta">${getProvider().label} &middot; ${tokenPricing} &middot; ${oneMessageCost}/1K+1K</div></div>`;
+                <div class="model-item-meta">${getProvider().badge || getProvider().label} &middot; ${tokenPricing} &middot; ${displayCostMeta}</div></div>`;
         }).join('');
         if (state.provider === 'openrouter') {
             const paidModels = filteredModels.filter(m => !getModelTraits(m).free);
@@ -166,6 +234,11 @@ const PROVIDERS = {
         const inputTokens = estimateCurrentInputTokens();
         const outputTokens = Number(state.settings.maxTokens) || 0;
         const cost = formatEstimatedMessageCost(state.selectedModel, inputTokens, outputTokens);
+        if (cost === 'Provider pricing') {
+            el.selectedModelName.textContent = `${name} · Provider pricing`;
+            el.selectedModelName.title = `${formatTokenPricing(state.selectedModel)}. Pricing is shown in the provider console.`;
+            return;
+        }
         el.selectedModelName.textContent = `${name} · ~${cost}/msg`;
         el.selectedModelName.title = `${formatTokenPricing(state.selectedModel)}. Message estimate uses current context plus max output tokens.`;
     }
@@ -188,6 +261,8 @@ const PROVIDERS = {
         renderModelList(state.models.filter(m => m.id.toLowerCase().includes(normalizedQuery) || (m.name && m.name.toLowerCase().includes(normalizedQuery))));
     }
     function setModelFilter(filter) {
+        const chip = el.modelFilterRow.querySelector(`[data-filter="${filter}"]`);
+        if (chip?.hidden) filter = 'all';
         state.modelFilter = filter;
         el.modelFilterRow.querySelectorAll('.model-filter-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.filter === filter));
         filterModels(el.modelSearch.value);
@@ -204,8 +279,18 @@ const PROVIDERS = {
     }
 
     function updateProviderUI() {
+        const provider = getProvider();
         el.providerSelect.value = state.provider;
         el.apiKeyInput.value = state.apiKeys[state.provider] || '';
+        if (el.apiKeyLabel) el.apiKeyLabel.textContent = provider.apiKeyLabel || `${provider.label} API Key`;
+        if (el.apiKeyInput) el.apiKeyInput.placeholder = provider.apiKeyPlaceholder || 'Enter API key for selected provider';
+        if (el.apiKeyHint) el.apiKeyHint.textContent = provider.apiKeyHint || 'Your API keys remain locally stored in your browser and are sent directly to the selected provider.';
+        if (el.testProviderBtn) el.testProviderBtn.textContent = `Test ${provider.label} Connection`;
+        const freeFilter = el.modelFilterRow.querySelector('[data-filter="free"]');
+        if (freeFilter) {
+            freeFilter.hidden = state.provider !== 'openrouter';
+            if (freeFilter.hidden && state.modelFilter === 'free') state.modelFilter = 'all';
+        }
         el.modelFilterRow.querySelectorAll('.model-filter-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.filter === state.modelFilter));
         updateProviderStatusUI();
         updateWebSearchUI();
@@ -214,8 +299,10 @@ const PROVIDERS = {
 
     function updateWebSearchUI() {
         const provider = getProvider();
+        if (state.webSearchEnabled && !provider.supportsWebSearch) state.webSearchEnabled = false;
         el.webSearchToggle.classList.toggle('active', state.webSearchEnabled);
         el.webSearchStatus.textContent = state.webSearchEnabled ? 'On' : 'Off';
+        el.webSearchToggle.disabled = !provider.supportsWebSearch;
         el.webSearchToggle.title = provider.supportsWebSearch
             ? `${provider.label} web search is ${state.webSearchEnabled ? 'on' : 'off'}`
             : `${provider.label} direct API does not expose web search`;
@@ -365,6 +452,13 @@ const PROVIDERS = {
     }
 
     function toggleWebSearch() {
+        if (!getProvider().supportsWebSearch) {
+            state.webSearchEnabled = false;
+            updateWebSearchUI();
+            saveSettings();
+            showToast(`${getProvider().label} direct API has no web search endpoint`, 'info');
+            return;
+        }
         state.webSearchEnabled = !state.webSearchEnabled;
         updateWebSearchUI();
         saveSettings();
@@ -385,12 +479,14 @@ const PROVIDERS = {
             temperature: state.settings.temperature,
             max_tokens: state.settings.maxTokens,
             top_p: state.settings.topP,
-            stream: true,
-            stream_options: { include_usage: true }
+            stream: true
         };
+        if (state.provider !== 'groq') requestBody.stream_options = { include_usage: true };
         if (state.settings.topK > 0 && state.provider !== 'deepseek') requestBody.top_k = state.settings.topK;
-        if (state.settings.frequencyPenalty > 0) requestBody.frequency_penalty = state.settings.frequencyPenalty;
-        if (state.settings.presencePenalty > 0) requestBody.presence_penalty = state.settings.presencePenalty;
+        if (state.provider === 'groq') delete requestBody.top_k;
+        if (state.settings.frequencyPenalty > 0 && state.provider !== 'groq') requestBody.frequency_penalty = state.settings.frequencyPenalty;
+        if (state.settings.presencePenalty > 0 && state.provider !== 'groq') requestBody.presence_penalty = state.settings.presencePenalty;
+        if (state.provider === 'groq' && requestBody.temperature === 0) requestBody.temperature = 0.00000001;
 
         if (state.webSearchEnabled && provider.searchMode === 'openrouter-tool') {
             requestBody.tools = [{ type: 'openrouter:web_search', parameters: { max_results: 5, search_context_size: 'medium' } }];
@@ -398,7 +494,7 @@ const PROVIDERS = {
         const mcpTools = options.includeMcpTools === false
             ? []
             : (typeof buildProviderToolDefinitions === 'function' ? buildProviderToolDefinitions() : []);
-        if (mcpTools.length && !(state.webSearchEnabled && provider.searchMode === 'openrouter-tool')) {
+        if (mcpTools.length && provider.supportsNativeTools !== false && !(state.webSearchEnabled && provider.searchMode === 'openrouter-tool')) {
             requestBody.tools = mcpTools;
             requestBody.tool_choice = 'auto';
         }
@@ -436,10 +532,25 @@ const PROVIDERS = {
     async function parseApiError(response) {
         try {
             const err = await response.json();
-            return err.error?.message || err.message || 'API request failed';
+            return formatProviderError(response.status, err.error?.message || err.message || 'API request failed');
         } catch (e) {
-            return await response.text() || 'API request failed';
+            return formatProviderError(response.status, await response.text() || 'API request failed');
         }
+    }
+
+    function formatProviderError(status, message) {
+        const provider = getProvider();
+        const detail = String(message || '').trim();
+        if (state.provider === 'groq') {
+            if (status === 401 || /unauthorized|invalid api key|api key/i.test(detail)) return 'Groq API key was rejected. Check your Groq API key in Settings.';
+            if (status === 404 || /model.*not.*found|does not exist|not found/i.test(detail)) return 'Groq could not find that model. Pick a current Groq model or refresh the model list.';
+            if (status === 429 || /rate limit|too many requests/i.test(detail)) return 'Groq rate limit reached. Wait a moment or choose a smaller/faster model.';
+            if (status === 413 || /context|maximum context|token/i.test(detail)) return 'Groq rejected the request because the context or output token limit is too large.';
+            if (status === 400 && /unsupported|not supported|unknown parameter|invalid.*parameter/i.test(detail)) return `Groq rejected an unsupported request parameter. ${detail}`;
+            if (/failed to fetch|network|cors/i.test(detail)) return 'Could not reach GroqCloud. Check your network connection and browser CORS access.';
+            return `Groq request failed. ${detail}`;
+        }
+        return detail || `${provider.label} request failed`;
     }
 
     function normalizeUsage(usage) {

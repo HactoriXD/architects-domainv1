@@ -186,12 +186,20 @@
             box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
         }
         .model-badge.free { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+        .model-badge.groq { background: rgba(249, 115, 22, 0.16); color: #fdba74; }
         .model-badge.reasoning { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
         .model-badge.coding { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
         .model-badge.roleplay { background: rgba(236, 72, 153, 0.16); color: #f9a8d4; }
         .model-badge.paid { background: rgba(160, 160, 160, 0.14); color: var(--text-secondary); }
         .model-item-context { font-size: 0.75rem; color: var(--violet-400); font-family: var(--font-mono); }
         .model-item-meta { font-size: 0.75rem; color: var(--text-tertiary); }
+        .provider-empty-state {
+            margin: 4px 6px 8px;
+            border: 1px solid rgba(249, 115, 22, 0.18);
+            border-radius: var(--radius-md);
+            background: rgba(249, 115, 22, 0.08);
+            color: #fdba74;
+        }
 
 /* Buttons */
         .btn { 

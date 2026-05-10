@@ -189,7 +189,7 @@
             if (items.length === 0) return '';
             return `<div class="chat-list-section"><div class="chat-list-section-title">${title}</div>${items.map(c => {
                 const previewParts = [];
-                if (c.messages.length) previewParts.push(`${c.messages.length} invocations`);
+                if (c.messages.length) previewParts.push(`${c.messages.length} ${c.messages.length === 1 ? 'message' : 'messages'}`);
                 if (c.pinnedNotes) previewParts.push('pinned');
                 const preview = previewParts.join(' / ');
                 const previewHtml = preview ? `<div class="chat-item-preview">${escapeHtml(preview)}</div>` : '';

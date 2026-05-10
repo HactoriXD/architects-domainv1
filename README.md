@@ -28,6 +28,7 @@ The project is designed as a personal AI cockpit rather than a generic chatbot c
 
 - **Multi-provider chat**
   - OpenRouter
+  - Groq
   - DeepSeek
   - Venice.ai
 
@@ -186,8 +187,19 @@ npm test
 Supported providers:
 
 - OpenRouter
+- Groq
 - DeepSeek
 - Venice.ai
+
+### GroqCloud
+
+Groq support uses GroqCloud's OpenAI-compatible API:
+
+- Base URL: `https://api.groq.com/openai/v1`
+- Chat endpoint: `/chat/completions`
+- Auth: `Authorization: Bearer <GROQ_API_KEY>`
+
+Add a Groq API key in Settings after creating one in the GroqCloud console. The key is stored locally in browser storage, just like the other provider keys. The Groq model list is curated from Groq's public model documentation and can change as Groq updates model availability; pricing is shown only when exact local metadata is present, otherwise the UI points to provider pricing.
 
 ## Hosting
 

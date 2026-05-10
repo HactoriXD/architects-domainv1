@@ -139,7 +139,9 @@
         settingsBtn: document.getElementById('settingsBtn'),
         settingsPanel: document.getElementById('settingsPanel'),
         providerSelect: document.getElementById('providerSelect'),
+        apiKeyLabel: document.getElementById('apiKeyLabel'),
         apiKeyInput: document.getElementById('apiKeyInput'),
+        apiKeyHint: document.getElementById('apiKeyHint'),
         providerStatus: document.getElementById('providerStatus'),
         testProviderBtn: document.getElementById('testProviderBtn'),
         clearLocalKeysBtn: document.getElementById('clearLocalKeysBtn'),
@@ -309,20 +311,22 @@
         return perMillion < 0.01 ? '$' + perMillion.toFixed(4) : perMillion < 1 ? '$' + perMillion.toFixed(3) : '$' + perMillion.toFixed(2);
     };
     const formatPer1KCost = (value) => {
+        if (value === 'provider' || value === 'unknown') return 'Provider pricing';
         const cost = Number(value);
-        if (!Number.isFinite(cost)) return 'N/A';
+        if (!Number.isFinite(cost)) return 'Provider pricing';
         if (cost === 0) return 'Free';
         return cost < 0.001 ? `$${cost.toFixed(5)}` : cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(3)}`;
     };
     const formatDollarCost = (value) => {
+        if (value === null || value === 'provider' || value === 'unknown') return 'Provider pricing';
         const cost = Number(value);
-        if (!Number.isFinite(cost)) return 'N/A';
+        if (!Number.isFinite(cost)) return 'Provider pricing';
         if (cost === 0) return 'Free';
         return cost < 0.001 ? `$${cost.toFixed(5)}` : cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(3)}`;
     };
     const formatFileSize = (bytes) => bytes < 1024 ? bytes+' B' : bytes < 1024*1024 ? (bytes/1024).toFixed(1)+' KB' : (bytes/(1024*1024)).toFixed(1)+' MB';
     const isVisionModel = (id) => VISION_MODELS.some(vm => id.includes(vm.split('/')[1]) || id === vm);
-    const hasFreePricing = (m) => Number(m.input_cost_per_1k_tokens) === 0 && Number(m.output_cost_per_1k_tokens) === 0;
+    const hasFreePricing = (m) => Number.isFinite(Number(m.input_cost_per_1k_tokens)) && Number.isFinite(Number(m.output_cost_per_1k_tokens)) && Number(m.input_cost_per_1k_tokens) === 0 && Number(m.output_cost_per_1k_tokens) === 0;
     const getProvider = () => PROVIDERS[state.provider] || PROVIDERS[CONFIG.DEFAULT_PROVIDER];
     const getApiKey = () => (state.apiKeys[state.provider] || '').trim();
 
@@ -362,13 +366,15 @@
         const free = state.provider === 'openrouter' ? model.id.includes(':free') : hasFreePricing(model);
         const inOpenRouterRoleplay = state.provider === 'openrouter' && state.modelCategories.roleplay.has(model.id);
         const inOpenRouterCoding = state.provider === 'openrouter' && state.modelCategories.coding.has(model.id);
+        const tags = Array.isArray(model.tags) ? model.tags.join(' ').toLowerCase() : '';
+        const traitsText = `${haystack} ${tags}`;
         return {
             free,
             paid: !free,
-            vision: isVisionModel(model.id) || /vision|vl|multimodal|gpt-4o|pixtral|llava/.test(haystack),
-            reasoning: /reason|thinking|r1|o1|o3|o4|qvq|qwq|deepseek-r|grok-4|sonnet|opus/.test(haystack),
-            coding: inOpenRouterCoding || /code|coder|coding|programming|devstral|codestral|qwen3-coder|claude|sonnet|gpt-5|deepseek|cobuddy/.test(haystack),
-            roleplay: inOpenRouterRoleplay || /roleplay|character|story|storytelling|creative writing|rp|uncensored|mythomax|psyfighter|noromaid|wizard|dolphin|venice|janitor|sillytavern|magnum|euryale|toppy|cinematika/.test(haystack)
+            vision: isVisionModel(model.id) || /vision|vl|multimodal|gpt-4o|pixtral|llava/.test(traitsText),
+            reasoning: /reason|thinking|r1|o1|o3|o4|qvq|qwq|deepseek-r|grok-4|gpt-oss|qwen|sonnet|opus/.test(traitsText),
+            coding: inOpenRouterCoding || /code|coder|coding|programming|devstral|codestral|qwen3-coder|claude|sonnet|gpt-5|gpt-oss|qwen|deepseek|cobuddy/.test(traitsText),
+            roleplay: inOpenRouterRoleplay || /roleplay|character|story|storytelling|creative writing|rp|uncensored|mythomax|psyfighter|noromaid|wizard|dolphin|venice|janitor|sillytavern|magnum|euryale|toppy|cinematika/.test(traitsText)
         };
     }
 
@@ -406,6 +412,14 @@
                 source: registry.estimated ? 'estimated' : 'provider'
             };
         }
+        if (providerId === 'groq' && model.pricing_note) {
+            return {
+                input: 'provider',
+                output: 'provider',
+                estimated: false,
+                source: 'provider'
+            };
+        }
         if (Number.isFinite(rawPromptNumber) && Number.isFinite(rawCompletionNumber)) {
             return {
                 input: rawPromptNumber * 1000,
@@ -422,6 +436,14 @@
                 source: registry.estimated ? 'estimated' : 'provider'
             };
         }
+        if (providerId === 'groq') {
+            return {
+                input: 'provider',
+                output: 'provider',
+                estimated: false,
+                source: 'provider'
+            };
+        }
         const estimate = PROVIDER_PRICING_ESTIMATES_USD_PER_1M[providerId] || PROVIDER_PRICING_ESTIMATES_USD_PER_1M.openrouter;
         return {
             input: estimate.input / 1000,
@@ -432,12 +454,16 @@
     }
 
     function formatTokenPricing(model) {
+        if (model.pricing_note || model.input_cost_per_1k_tokens === 'provider' || model.output_cost_per_1k_tokens === 'provider') {
+            return model.pricing_note || 'Provider pricing';
+        }
         const suffix = model.pricing_estimated ? ' est.' : '';
         return `In ${formatPer1KCost(model.input_cost_per_1k_tokens)}/1K · Out ${formatPer1KCost(model.output_cost_per_1k_tokens)}/1K${suffix}`;
     }
 
     function estimateMessageCost(model, inputTokens, outputTokens) {
         if (!model) return null;
+        if (model.pricing_note || model.input_cost_per_1k_tokens === 'provider' || model.output_cost_per_1k_tokens === 'provider') return 'provider';
         const inputCost = (Math.max(0, inputTokens || 0) / 1000) * Number(model.input_cost_per_1k_tokens || 0);
         const outputCost = (Math.max(0, outputTokens || 0) / 1000) * Number(model.output_cost_per_1k_tokens || 0);
         return inputCost + outputCost;
@@ -451,6 +477,8 @@
     function normalizeModel(providerId, model) {
         const id = model.id || model.model || model.name;
         const normalized = normalizeModelPricing(providerId, { ...model, id });
+        const normalizedPromptPricing = Number.isFinite(Number(normalized.input)) ? normalized.input / 1000 : null;
+        const normalizedCompletionPricing = Number.isFinite(Number(normalized.output)) ? normalized.output / 1000 : null;
         return {
             ...model,
             id,
@@ -462,10 +490,14 @@
             currency: 'USD',
             pricing_estimated: normalized.estimated,
             pricing_source: normalized.source,
+            pricing_note: model.pricing_note || null,
+            max_completion_tokens: model.max_completion_tokens || model.maxCompletionTokens || null,
+            tags: Array.isArray(model.tags) ? model.tags : [],
+            capabilities: model.capabilities || {},
             pricing: {
                 ...(model.pricing || {}),
-                prompt: normalized.input / 1000,
-                completion: normalized.output / 1000
+                prompt: normalizedPromptPricing,
+                completion: normalizedCompletionPricing
             }
         };
     }
@@ -481,6 +513,9 @@
             return [
                 normalizeModel(providerId, { id: 'venice-uncensored', name: 'Venice Uncensored', context_length: 128000 })
             ];
+        }
+        if (providerId === 'groq') {
+            return GROQ_CURATED_MODELS.map(model => normalizeModel(providerId, model));
         }
         return [];
     }

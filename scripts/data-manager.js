@@ -29,7 +29,23 @@ function getStorageSnapshot() {
         const value = localStorage.getItem(key);
         if (value !== null) values[key] = value;
     });
+    redactGroqKeyFromPlainStorageSnapshot(values);
     return values;
+}
+
+function redactGroqKeyFromPlainStorageSnapshot(values) {
+    const rawSettings = values[CONFIG.SETTINGS_KEY];
+    if (!rawSettings) return;
+    try {
+        const settings = JSON.parse(rawSettings);
+        if (settings?.apiKeys?.groq) {
+            settings.apiKeys = { ...settings.apiKeys };
+            delete settings.apiKeys.groq;
+            values[CONFIG.SETTINGS_KEY] = JSON.stringify(settings);
+        }
+    } catch (e) {
+        // Leave malformed settings untouched so backup/import behavior stays predictable.
+    }
 }
 
 function getLocalDataBackupPayload() {
