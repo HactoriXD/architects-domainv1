@@ -81,7 +81,7 @@
         mcpRegistry: [],
         mcpExecutions: [],
         mcpBridgeHealth: { status: 'unknown', checkedAt: 0, error: '' },
-        mcpControl: { open: false, selectedId: 'builtin-filesystem', config: null, status: null, tools: [], log: [], logFilterServer: 'all', logFilterType: 'all', logSearch: '', privacyMode: false, demoMode: false, toolCallingMode: 'native', toolContextPreviewOpen: false, parserErrors: [], approvalQueue: [], sessionApprovals: {}, importPreview: null },
+        mcpControl: { enabled: false, open: false, selectedId: 'builtin-filesystem', config: null, status: null, tools: [], log: [], logFilterServer: 'all', logFilterType: 'all', logSearch: '', privacyMode: false, demoMode: false, toolCallingMode: 'native', toolContextPreviewOpen: false, parserErrors: [], approvalQueue: [], sessionApprovals: {}, importPreview: null },
         mcpMemoryContext: [],
         workspaces: {},
         activeWorkspaceId: null,
@@ -215,6 +215,8 @@
         mcpBridgeStatus: document.getElementById('mcpBridgeStatus'),
         mcpExecutionList: document.getElementById('mcpExecutionList'),
         mcpControlCenterBtn: document.getElementById('mcpControlCenterBtn'),
+        mcpEnabledToggle: document.getElementById('mcpEnabledToggle'),
+        mcpStatusPill: document.getElementById('mcpStatusPill'),
         mcpControlCenterModal: document.getElementById('mcpControlCenterModal'),
         mcpControlCloseBtn: document.getElementById('mcpControlCloseBtn'),
         mcpControlServerList: document.getElementById('mcpControlServerList'),
@@ -313,6 +315,7 @@
     // Utility Functions
     // ============================================
     const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const isMcpToolsEnabled = () => Boolean(state.mcpControl?.enabled);
     const estimateTokens = (text) => text ? Math.ceil((text.length / 4 + text.split(/\s+/).filter(w=>w).length) / 2 * 1.3) : 0;
     const formatContextSize = (size) => size >= 1000000 ? (size/1000000).toFixed(1)+'M' : size >= 1000 ? (size/1000).toFixed(0)+'K' : size.toString();
     const escapeHtml = (text) => String(text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');

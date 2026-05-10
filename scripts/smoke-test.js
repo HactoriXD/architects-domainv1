@@ -113,6 +113,57 @@ async function main() {
     const screenshotJson = await browserScreenshot.json();
     assert(screenshotJson.result?.screenshotBase64?.length > 100, 'Expected browser screenshot base64 output');
 
+    const browserNavigate = await fetch(`${baseUrl}/mcp/browser/browser_navigate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: baseUrl })
+    });
+    assert(browserNavigate.ok, 'Expected MCP browser navigate to pass');
+
+    const browserScreenshotCurrent = await fetch(`${baseUrl}/mcp/browser/browser_screenshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullPage: false })
+    });
+    assert(browserScreenshotCurrent.ok, 'Expected MCP browser current-page screenshot to pass');
+
+    const browserTextCurrent = await fetch(`${baseUrl}/mcp/browser/browser_extract_text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    assert(browserTextCurrent.ok, 'Expected MCP browser current-page text extraction to pass');
+    const textJson = await browserTextCurrent.json();
+    assert(String(textJson.result?.text || '').includes('Architect'), 'Expected browser text extraction to include app text');
+
+    const browserScreenshotAgain = await fetch(`${baseUrl}/mcp/browser/browser_screenshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: baseUrl, fullPage: false })
+    });
+    assert(browserScreenshotAgain.ok, 'Expected MCP browser screenshot repeat to pass');
+
+    const browserTextAgain = await fetch(`${baseUrl}/mcp/browser/browser_extract_text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: baseUrl })
+    });
+    assert(browserTextAgain.ok, 'Expected MCP browser text repeat to pass');
+
+    const browserBadUrl = await fetch(`${baseUrl}/mcp/browser/browser_screenshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'javascript:alert(1)' })
+    });
+    assert(browserBadUrl.status >= 400, 'Expected unsafe browser URL to fail');
+
+    const browserAfterFailure = await fetch(`${baseUrl}/mcp/browser/browser_screenshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: baseUrl, fullPage: false })
+    });
+    assert(browserAfterFailure.ok, 'Expected MCP browser to recover after failed URL');
+
     const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
     assert(!serverSource.includes('Architectâ'), 'Server contains mojibake text');
 

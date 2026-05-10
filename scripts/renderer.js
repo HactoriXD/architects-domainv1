@@ -41,6 +41,63 @@
         }
     };
 
+    window.copyMcpToolResult = async function(index) {
+        const msg = state.messages[index];
+        if (!msg) return;
+        try {
+            await navigator.clipboard.writeText(msg.toolRawOutput || msg.content || '');
+            showToast('Tool result copied', 'success');
+        } catch (err) {
+            showToast('Failed to copy tool result', 'error');
+        }
+    };
+
+    window.retryMcpToolResult = async function(index) {
+        const msg = state.messages[index];
+        if (!msg || !window.ArchitectMCP?.executeToolCall) return;
+        try {
+            const execution = await window.ArchitectMCP.executeToolCall(msg.qualifiedName || msg.toolName, msg.toolArgs || {}, { source: 'retry' });
+            const resultMessage = window.ArchitectMCP.renderToolResult ? window.ArchitectMCP.renderToolResult(execution) : null;
+            if (resultMessage) state.messages.push(resultMessage);
+            syncCurrentChatMessages();
+            saveChats();
+            renderMessages();
+            scrollToBottom();
+        } catch (error) {
+            showToast(error.message || 'Tool retry failed', 'error');
+        }
+    };
+
+    window.resetMcpToolServerFromMessage = async function(index) {
+        const msg = state.messages[index];
+        if (!msg || !window.ArchitectMCP?.resetSession) return;
+        try {
+            const result = await window.ArchitectMCP.resetSession(msg.serverId || msg.serverName || '');
+            const message = window.ArchitectMCP.buildDebugMessage
+                ? {
+                    role: 'tool_result',
+                    content: `Reset ${msg.serverName || 'MCP server'} session.`,
+                    timestamp: Date.now(),
+                    attachments: [],
+                    status: 'success',
+                    toolName: 'reset',
+                    serverName: 'MCP',
+                    toolArgs: { serverId: msg.serverId || '', serverName: msg.serverName || '' },
+                    toolPreview: `Reset ${msg.serverName || 'MCP server'} session.`,
+                    toolImages: [],
+                    toolRawOutput: JSON.stringify(result, null, 2)
+                }
+                : null;
+            if (message) state.messages.push(message);
+            syncCurrentChatMessages();
+            saveChats();
+            renderMessages();
+            scrollToBottom();
+        } catch (error) {
+            showToast(error.message || 'MCP reset failed', 'error');
+        }
+    };
+
     window.toggleMessageThinking = function(index) {
         const panel = document.querySelector(`.message[data-index="${index}"] .message-thinking`);
         const button = document.querySelector(`.message[data-index="${index}"] .message-thinking-toggle`);
@@ -144,8 +201,9 @@ function renderMessages() {
                 </div>`;
             
             // Edit form (hidden by default) - escape content for safety
+            const visibleContent = getVisibleMessageContent(msg, isUser, isTool);
             const escapedContent = escapeHtml(msg.content);
-            const toolBodyHtml = isTool ? renderToolResultBody(msg) : '';
+            const toolBodyHtml = isTool ? renderToolResultBody(msg, i) : '';
             const thinkingHtml = !isUser && !isTool ? renderThinkingPanel(msg, i) : '';
             const editForm = `
                 <div class="message-edit-container">
@@ -166,7 +224,7 @@ function renderMessages() {
                     <div class="message-header"><span class="message-role">${isUser ? 'You' : isTool ? 'MCP Tool' : CONFIG.ASSISTANT_NAME}</span><span class="message-time">${time}</span></div>
                     ${attachmentsHtml}
                     ${thinkingHtml}
-                    <div class="message-body message-bubble">${isTool ? toolBodyHtml : formatMessageContent(msg.content)}</div>
+                    <div class="message-body message-bubble">${isTool ? toolBodyHtml : formatMessageContent(visibleContent)}</div>
                     ${statusHtml}
                     ${editForm}
                     ${isTool ? '' : isUser ? userActions : assistantActions}
@@ -176,7 +234,14 @@ function renderMessages() {
         updateConversationNavState();
     }
 
-    function renderToolResultBody(msg) {
+    function getVisibleMessageContent(msg, isUser, isTool) {
+        if (isUser || isTool) return msg.content;
+        if (window.ArchitectMCP?.stripToolMarkup) return window.ArchitectMCP.stripToolMarkup(msg.content || '');
+        if (typeof stripFallbackMcpToolMarkup === 'function') return stripFallbackMcpToolMarkup(msg.content || '');
+        return msg.content;
+    }
+
+    function renderToolResultBody(msg, index) {
         const status = escapeHtml(msg.status || 'done');
         const server = escapeHtml(msg.serverName || 'MCP');
         const tool = escapeHtml(msg.toolName || 'tool');
@@ -187,6 +252,8 @@ function renderMessages() {
         const imagesHtml = images.map((image, index) => (
             `<img class="tool-result-screenshot" src="${escapeHtml(image.src)}" alt="${escapeHtml(image.alt || `Tool image ${index + 1}`)}" loading="lazy" style="max-width:100%;border-radius:8px;margin-top:8px;">`
         )).join('');
+        const retryDisabled = !msg.qualifiedName && !msg.toolName ? 'disabled' : '';
+        const resetDisabled = !msg.serverId && !msg.serverName ? 'disabled' : '';
         return `
             <div class="tool-result-card">
                 <div class="tool-result-top">
@@ -195,6 +262,11 @@ function renderMessages() {
                 </div>
                 <div class="tool-result-preview">${preview}</div>
                 ${imagesHtml}
+                <div class="message-actions">
+                    <button class="message-action-btn copy-btn" type="button" onclick="copyMcpToolResult(${index})">Copy</button>
+                    <button class="message-action-btn" type="button" onclick="retryMcpToolResult(${index})" ${retryDisabled}>Retry</button>
+                    <button class="message-action-btn" type="button" onclick="resetMcpToolServerFromMessage(${index})" ${resetDisabled}>Reset</button>
+                </div>
                 <details class="tool-result-details">
                     <summary>Show tool output</summary>
                     <div class="tool-result-grid">

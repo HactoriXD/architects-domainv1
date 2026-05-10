@@ -73,6 +73,14 @@ function ensureBuiltInMcpServers() {
 }
 
 async function refreshMcpControlData() {
+    if (!isMcpToolsEnabled()) {
+        state.mcpControl.status = null;
+        state.mcpControl.config = null;
+        state.mcpControl.tools = [];
+        state.mcpControl.log = [];
+        updateMcpAvailabilityUi();
+        return;
+    }
     if (location.protocol === 'file:') {
         state.mcpControl.status = null;
         state.mcpControl.config = null;
@@ -140,6 +148,11 @@ function ingestBridgeMcpLogs() {
 }
 
 async function openMcpControlCenter() {
+    if (!isMcpToolsEnabled()) {
+        showToast('MCP tools are disabled. Enable them in Settings → Experimental.', 'info');
+        if (typeof openSettings === 'function') openSettings(false);
+        return;
+    }
     ensureBuiltInMcpServers();
     state.mcpControl.open = true;
     state.mcpControl.privacyMode = localStorage.getItem('architects_domain_mcp_privacy_mode') === 'true' || Boolean(state.mcpControl.privacyMode);
@@ -1073,16 +1086,50 @@ async function handleMcpActivityAction(event) {
 
 function renderMcpComposerIndicator() {
     if (!el.mcpComposerIndicator) return;
+    if (!isMcpToolsEnabled()) {
+        el.mcpComposerIndicator.hidden = true;
+        el.mcpComposerIndicator.classList.remove('active');
+        if (el.mcpComposerDropdown) el.mcpComposerDropdown.innerHTML = '';
+        const controlBadge = document.getElementById('mcpControlBadge');
+        if (controlBadge) controlBadge.hidden = true;
+        updateMcpAvailabilityUi();
+        return;
+    }
+    el.mcpComposerIndicator.hidden = false;
     const tools = getActiveMcpTools();
     const servers = getWorkspaceMcpServers().filter(server => isMcpServerActiveInCurrentChat(server));
     const excluded = getMcpExcludedTools().slice(0, 12);
     el.mcpComposerIndicator.classList.toggle('active', tools.length > 0);
     el.mcpComposerIndicator.querySelector('span').textContent = `${tools.length} MCP ${tools.length === 1 ? 'tool' : 'tools'}`;
+    const controlBadge = document.getElementById('mcpControlBadge');
+    if (controlBadge) {
+        controlBadge.hidden = tools.length === 0;
+        controlBadge.textContent = tools.length ? String(Math.min(tools.length, 99)) : '';
+        controlBadge.setAttribute('aria-label', `${tools.length} active MCP ${tools.length === 1 ? 'tool' : 'tools'}`);
+    }
     el.mcpComposerDropdown.innerHTML = tools.length ? servers.map(server => {
         const serverTools = tools.filter(tool => tool.serverId === server.id);
         if (!serverTools.length) return '';
         return `<div class="mcp-composer-server"><strong>${maskMcpText(server.name)}</strong>${serverTools.map(tool => `<span>${escapeHtml(tool.name)}</span>`).join('')}</div>`;
     }).join('') + (excluded.length ? `<div class="mcp-composer-excluded"><strong>Excluded</strong>${excluded.map(tool => `<span>${escapeHtml(tool.name)} · ${escapeHtml(tool.reason)}</span>`).join('')}</div>` : '') : '<div class="mcp-composer-empty">No active MCP tools in this chat.</div>';
+}
+
+function updateMcpAvailabilityUi() {
+    const enabled = isMcpToolsEnabled();
+    if (el.mcpControlCenterBtn) el.mcpControlCenterBtn.hidden = !enabled;
+    if (el.mcpEnabledToggle) el.mcpEnabledToggle.checked = enabled;
+    if (el.mcpStatusPill) {
+        const hasError = enabled && (
+            Boolean(state.mcpControl?.status?.servers?.some(server => ['error', 'offline'].includes(server.status) || server.statusState === 'error'))
+            || Boolean(state.mcpBridgeHealth?.status === 'error')
+        );
+        const ready = enabled && !hasError;
+        el.mcpStatusPill.textContent = enabled ? (hasError ? 'MCP: Error' : 'MCP: Ready') : 'MCP: Off';
+        el.mcpStatusPill.className = `mcp-status-pill ${enabled ? (ready ? 'ready' : 'error') : 'off'}`;
+        el.mcpStatusPill.title = enabled
+            ? hasError ? 'MCP tools are enabled, but at least one MCP server reported an error.' : 'MCP tools are enabled.'
+            : 'MCP tools are disabled. Enable them in Settings → Experimental.';
+    }
 }
 
 function buildMcpToolContextPreview(selectedServer = null) {
@@ -1371,7 +1418,8 @@ function humanizeError(error) {
 }
 
 function initMcpUi() {
-    ensureBuiltInMcpServers();
+    updateMcpAvailabilityUi();
+    if (isMcpToolsEnabled()) ensureBuiltInMcpServers();
     if (el.mcpControlCenterBtn) el.mcpControlCenterBtn.addEventListener('click', openMcpControlCenter);
     if (el.mcpControlCloseBtn) el.mcpControlCloseBtn.addEventListener('click', closeMcpControlCenter);
     if (el.mcpControlCenterModal) {
@@ -1401,7 +1449,11 @@ function initMcpUi() {
         state.mcpControl.toolContextPreviewOpen = true;
         openMcpControlCenter();
     });
-    refreshMcpBridgeStatus();
-    refreshMcpControlData().catch(() => {}).finally(renderMcpControlCenter);
+    if (isMcpToolsEnabled()) {
+        refreshMcpBridgeStatus();
+        refreshMcpControlData().catch(() => {}).finally(renderMcpControlCenter);
+    } else {
+        renderMcpComposerIndicator();
+    }
     renderMcpExecutionCards();
 }

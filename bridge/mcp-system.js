@@ -39,14 +39,25 @@ const MIME_TYPES = {
 
 const pendingOperations = new Map();
 const requestLog = [];
-let browserState = {
-  browser: null,
-  page: null,
-  currentUrl: '',
-  launchedAt: 0,
-  lastUsedAt: 0,
-  idleTimer: null
-};
+function createBrowserState() {
+  return {
+    browser: null,
+    page: null,
+    currentUrl: '',
+    launchedAt: 0,
+    lastUsedAt: 0,
+    idleTimer: null,
+    actionLock: Promise.resolve(),
+    sessionId: createId(),
+    pageReady: false,
+    lastNavigationAt: null,
+    lastScreenshotAt: null,
+    lastExtractAt: null,
+    lastError: ''
+  };
+}
+
+let browserState = createBrowserState();
 
 const BUILT_IN_TOOLS = {
   filesystem: [
@@ -102,10 +113,10 @@ const BUILT_IN_TOOLS = {
       waitFor: { type: 'string', enum: ['load', 'networkidle', 'selector'], default: 'load' },
       selector: schemaString('Selector required when waitFor is selector.')
     }, ['url']),
-    tool('browser_extract_text', 'Extract readable page text from a URL or selector.', 'network', {
-      url: schemaString('HTTP or HTTPS URL.'),
+    tool('browser_extract_text', 'Extract readable page text from a URL or the current page.', 'network', {
+      url: schemaString('Optional HTTP or HTTPS URL.'),
       selector: schemaString('Optional CSS selector.')
-    }, ['url']),
+    }),
     tool('browser_extract_structured', 'Extract page text for frontend model-based schema extraction.', 'network', {
       url: schemaString('HTTP or HTTPS URL.'),
       schema: { type: 'object', description: 'Desired output JSON schema.' }
@@ -588,43 +599,47 @@ async function callBrowser(name, args) {
 }
 
 async function browserNavigate(args) {
-  const page = await getBrowserPage();
-  const url = validateHttpUrl(args.url);
-  await page.goto(url, { waitUntil: args.waitFor === 'networkidle' ? 'networkidle2' : 'load', timeout: 30000 });
-  if (args.waitFor === 'selector' && args.selector) await page.waitForSelector(args.selector, { timeout: 12000 });
-  const screenshotBase64 = await page.screenshot({ encoding: 'base64', fullPage: false });
-  const title = await page.title();
-  touchBrowser();
-  return { success: true, title, url: page.url(), screenshotBase64 };
+  return withBrowserPage('navigate', async page => {
+    const url = validateHttpUrl(args.url);
+    await page.goto(url, { waitUntil: args.waitFor === 'networkidle' ? 'networkidle2' : 'load', timeout: 30000 });
+    if (args.waitFor === 'selector' && args.selector) await page.waitForSelector(args.selector, { timeout: 12000 });
+    const screenshotBase64 = await page.screenshot({ encoding: 'base64', fullPage: false });
+    const title = await page.title();
+    browserState.lastNavigationAt = new Date().toISOString();
+    browserState.pageReady = true;
+    return { success: true, title, url: page.url(), screenshotBase64 };
+  });
 }
 
 async function browserExtractText(args) {
-  const page = await getBrowserPage();
-  const url = validateHttpUrl(args.url);
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-  const selector = String(args.selector || '').trim();
-  const text = await page.evaluate(sel => {
-    const root = sel ? document.querySelector(sel) : document.body;
-    if (!root) return '';
-    const blocked = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'SVG']);
-    function walk(node, parts) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const value = node.textContent.replace(/\s+/g, ' ').trim();
-        if (value) parts.push(value);
-        return;
+  return withBrowserPage('extract_text', async page => {
+    if (args.url) await page.goto(validateHttpUrl(args.url), { waitUntil: 'networkidle2', timeout: 30000 });
+    else if (!browserHasReadablePage(page)) throw createHttpError(400, 'MISSING_URL', 'URL is required until a browser page has been opened');
+    const selector = String(args.selector || '').trim();
+    const text = await page.evaluate(sel => {
+      const root = sel ? document.querySelector(sel) : document.body;
+      if (!root) return '';
+      const blocked = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'SVG']);
+      function walk(node, parts) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const value = node.textContent.replace(/\s+/g, ' ').trim();
+          if (value) parts.push(value);
+          return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE || blocked.has(node.tagName)) return;
+        const before = ['H1', 'H2', 'H3', 'H4', 'P', 'LI', 'SECTION', 'ARTICLE'].includes(node.tagName);
+        if (before) parts.push('\n');
+        for (const child of node.childNodes) walk(child, parts);
+        if (before) parts.push('\n');
       }
-      if (node.nodeType !== Node.ELEMENT_NODE || blocked.has(node.tagName)) return;
-      const before = ['H1', 'H2', 'H3', 'H4', 'P', 'LI', 'SECTION', 'ARTICLE'].includes(node.tagName);
-      if (before) parts.push('\n');
-      for (const child of node.childNodes) walk(child, parts);
-      if (before) parts.push('\n');
-    }
-    const parts = [];
-    walk(root, parts);
-    return parts.join(' ').replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
-  }, selector);
-  touchBrowser();
-  return { url: page.url(), title: await page.title(), text: text.slice(0, 200000) };
+      const parts = [];
+      walk(root, parts);
+      return parts.join(' ').replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
+    }, selector);
+    browserState.lastExtractAt = new Date().toISOString();
+    browserState.pageReady = browserHasReadablePage(page);
+    return { url: page.url(), title: await page.title(), text: text.slice(0, 200000) };
+  });
 }
 
 async function browserExtractStructured(args) {
@@ -637,11 +652,13 @@ async function browserExtractStructured(args) {
 }
 
 async function browserScreenshot(args) {
-  const page = await getBrowserPage();
-  if (args.url) await page.goto(validateHttpUrl(args.url), { waitUntil: 'networkidle2', timeout: 30000 });
-  const screenshotBase64 = await page.screenshot({ encoding: 'base64', fullPage: args.fullPage !== false });
-  touchBrowser();
-  return { success: true, title: await page.title(), url: page.url(), screenshotBase64 };
+  return withBrowserPage('screenshot', async page => {
+    if (args.url) await page.goto(validateHttpUrl(args.url), { waitUntil: 'networkidle2', timeout: 30000 });
+    const screenshotBase64 = await page.screenshot({ encoding: 'base64', fullPage: args.fullPage !== false });
+    browserState.lastScreenshotAt = new Date().toISOString();
+    browserState.pageReady = browserHasReadablePage(page);
+    return { success: true, title: await page.title(), url: page.url(), screenshotBase64 };
+  });
 }
 
 async function browserSearch(args) {
@@ -695,49 +712,80 @@ async function browserSearch(args) {
 }
 
 async function browserClick(args) {
-  const page = await getBrowserPage();
-  if (args.text) {
-    const clicked = await page.evaluate(text => {
-      const target = Array.from(document.querySelectorAll('button,a,[role="button"],input[type="submit"]'))
-        .find(element => (element.innerText || element.value || '').trim().toLowerCase().includes(String(text).toLowerCase()));
-      if (!target) return false;
-      target.click();
-      return true;
-    }, args.text);
-    if (!clicked) throw createHttpError(404, 'ELEMENT_NOT_FOUND', 'No element matched the visible text');
-  } else {
-    if (!args.selector) throw createHttpError(400, 'MISSING_SELECTOR', 'Selector or text is required');
-    await page.click(args.selector);
-  }
-  touchBrowser();
-  return { success: true, url: page.url(), title: await page.title() };
+  return withBrowserPage('click', async page => {
+    if (args.text) {
+      const clicked = await page.evaluate(text => {
+        const target = Array.from(document.querySelectorAll('button,a,[role="button"],input[type="submit"]'))
+          .find(element => (element.innerText || element.value || '').trim().toLowerCase().includes(String(text).toLowerCase()));
+        if (!target) return false;
+        target.click();
+        return true;
+      }, args.text);
+      if (!clicked) throw createHttpError(404, 'ELEMENT_NOT_FOUND', 'No element matched the visible text');
+    } else {
+      if (!args.selector) throw createHttpError(400, 'MISSING_SELECTOR', 'Selector or text is required');
+      await page.click(args.selector);
+    }
+    browserState.pageReady = browserHasReadablePage(page);
+    return { success: true, url: page.url(), title: await page.title() };
+  });
 }
 
 async function browserType(args) {
-  const page = await getBrowserPage();
-  if (!args.selector) throw createHttpError(400, 'MISSING_SELECTOR', 'Selector is required');
-  await page.click(args.selector);
-  await page.keyboard.type(String(args.text || ''));
-  if (args.submit) await page.keyboard.press('Enter');
-  touchBrowser();
-  return { success: true, url: page.url(), title: await page.title() };
+  return withBrowserPage('type', async page => {
+    if (!args.selector) throw createHttpError(400, 'MISSING_SELECTOR', 'Selector is required');
+    await page.click(args.selector);
+    await page.keyboard.type(String(args.text || ''));
+    if (args.submit) await page.keyboard.press('Enter');
+    browserState.pageReady = browserHasReadablePage(page);
+    return { success: true, url: page.url(), title: await page.title() };
+  });
 }
 
 async function getBrowserPage() {
+  if (browserState.browser && typeof browserState.browser.isConnected === 'function' && !browserState.browser.isConnected()) {
+    await closeBrowserSession();
+  }
   if (!browserState.browser) {
     browserState.browser = await puppeteer.launch({ headless: 'new' });
     browserState.launchedAt = Date.now();
+    browserState.sessionId = createId();
     browserState.page = await browserState.browser.newPage();
     await browserState.page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 });
   }
-  if (!browserState.page || browserState.page.isClosed()) browserState.page = await browserState.browser.newPage();
+  if (!browserState.page || browserState.page.isClosed()) {
+    browserState.page = await browserState.browser.newPage();
+    await browserState.page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 });
+  }
   touchBrowser();
   return browserState.page;
 }
 
-function touchBrowser() {
+async function withBrowserPage(action, work) {
+  const run = (browserState.actionLock || Promise.resolve()).catch(() => {}).then(async () => {
+    const page = await getBrowserPage();
+    try {
+      const result = await work(page);
+      browserState.lastError = '';
+      touchBrowser(action);
+      return result;
+    } catch (error) {
+      browserState.lastError = error.message || String(error);
+      if (isStaleBrowserError(error)) await recreateBrowserPage().catch(() => {});
+      throw error;
+    } finally {
+      touchBrowser(action);
+    }
+  });
+  browserState.actionLock = run.catch(() => {});
+  return run;
+}
+
+function touchBrowser(action = '') {
   browserState.lastUsedAt = Date.now();
   browserState.currentUrl = browserState.page?.url?.() || browserState.currentUrl || '';
+  browserState.pageReady = browserHasReadablePage(browserState.page);
+  browserState.lastAction = action || browserState.lastAction || '';
   clearTimeout(browserState.idleTimer);
   browserState.idleTimer = setTimeout(() => closeBrowserSession().catch(() => {}), BROWSER_IDLE_MS);
 }
@@ -751,7 +799,24 @@ async function resetBrowserSession() {
 async function closeBrowserSession() {
   clearTimeout(browserState.idleTimer);
   if (browserState.browser) await browserState.browser.close().catch(() => {});
-  browserState = { browser: null, page: null, currentUrl: '', launchedAt: 0, lastUsedAt: 0, idleTimer: null };
+  browserState = createBrowserState();
+}
+
+async function recreateBrowserPage() {
+  if (browserState.page && !browserState.page.isClosed()) await browserState.page.close().catch(() => {});
+  browserState.page = null;
+  if (browserState.browser && typeof browserState.browser.isConnected === 'function' && !browserState.browser.isConnected()) {
+    await closeBrowserSession();
+  }
+}
+
+function browserHasReadablePage(page) {
+  const url = page?.url?.() || '';
+  return Boolean(url && url !== 'about:blank');
+}
+
+function isStaleBrowserError(error) {
+  return /Target closed|Session closed|Protocol error|Execution context was destroyed|Navigating frame was detached|Browser has disconnected/i.test(error?.message || '');
 }
 
 async function resetMcpSystemData() {
@@ -765,7 +830,14 @@ function getBrowserSessionStatus() {
     open: Boolean(browserState.browser),
     currentUrl: browserState.page?.url?.() || browserState.currentUrl || '',
     launchedAt: browserState.launchedAt || null,
-    lastUsedAt: browserState.lastUsedAt || null
+    lastUsedAt: browserState.lastUsedAt || null,
+    sessionId: browserState.sessionId,
+    pageReady: Boolean(browserState.pageReady),
+    lastNavigationAt: browserState.lastNavigationAt,
+    lastScreenshotAt: browserState.lastScreenshotAt,
+    lastExtractAt: browserState.lastExtractAt,
+    lastError: browserState.lastError || '',
+    lastAction: browserState.lastAction || ''
   };
 }
 
@@ -928,7 +1000,20 @@ function sanitizeLogParameters(value) {
 }
 
 function validateHttpUrl(value) {
-  const target = new URL(String(value || ''));
+  const raw = String(value || '').trim();
+  if (!raw) throw createHttpError(400, 'INVALID_URL', 'URL is required');
+  const normalized = /^localhost:\d+(?:\/.*)?$/i.test(raw) || /^127\.0\.0\.1:\d+(?:\/.*)?$/i.test(raw)
+    ? `http://${raw.replace(/\/?$/, '/')}`
+    : raw;
+  if (/^(?:javascript|data|file|chrome|edge|about):/i.test(normalized)) {
+    throw createHttpError(400, 'INVALID_URL', 'Only HTTP and HTTPS URLs are allowed');
+  }
+  let target;
+  try {
+    target = new URL(normalized);
+  } catch (error) {
+    throw createHttpError(400, 'INVALID_URL', 'URL must be a valid HTTP or HTTPS address');
+  }
   if (!['http:', 'https:'].includes(target.protocol)) throw createHttpError(400, 'INVALID_URL', 'Only HTTP and HTTPS URLs are allowed');
   return target.href;
 }

@@ -83,6 +83,19 @@
             e.target.value = '';
         });
         el.webSearchToggle.addEventListener('click', toggleWebSearch);
+        if (el.mcpEnabledToggle) {
+            el.mcpEnabledToggle.addEventListener('change', async (event) => {
+                state.mcpControl.enabled = Boolean(event.target.checked);
+                saveSettings();
+                if (typeof updateMcpAvailabilityUi === 'function') updateMcpAvailabilityUi();
+                if (state.mcpControl.enabled && typeof refreshMcpControlData === 'function') {
+                    await refreshMcpControlData().catch(error => showToast(error.message || 'MCP refresh failed', 'error'));
+                    if (typeof renderMcpControlCenter === 'function') renderMcpControlCenter();
+                    if (typeof renderMcpComposerIndicator === 'function') renderMcpComposerIndicator();
+                    if (typeof updateMcpAvailabilityUi === 'function') updateMcpAvailabilityUi();
+                }
+            });
+        }
         el.tempSlider.addEventListener('input', (e) => persistSliderSetting('temperature', parseFloat(e.target.value), el.tempValue, v => v.toFixed(1)));
         el.maxTokensSlider.addEventListener('input', (e) => persistSliderSetting('maxTokens', parseInt(e.target.value), el.maxTokensValue, v => v.toLocaleString()));
         el.topPSlider.addEventListener('input', (e) => persistSliderSetting('topP', parseFloat(e.target.value), el.topPValue, v => v.toFixed(2)));
@@ -254,6 +267,8 @@
         el.presPenaltyValue.textContent = state.settings.presencePenalty.toFixed(1);
         updateDeepSeekThinkingUI();
         updateSelectedModelCostDisplay();
+        if (el.mcpEnabledToggle) el.mcpEnabledToggle.checked = Boolean(state.mcpControl.enabled);
+        if (typeof updateMcpAvailabilityUi === 'function') updateMcpAvailabilityUi();
     }
 
     function resetSettings() {

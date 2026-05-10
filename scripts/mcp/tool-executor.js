@@ -20,6 +20,9 @@ function createMcpExecution(tool, args = {}) {
 }
 
 async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
+    if (window.ArchitectMCP?.executeToolCall && !options.__hostInternal) {
+        return window.ArchitectMCP.executeToolCall(qualifiedName, args, options);
+    }
     const tool = getMcpToolByQualifiedName(qualifiedName);
     if (!tool) throw new Error(`MCP tool not found: ${qualifiedName}`);
     const server = getWorkspaceMcpServers().find(item => item.id === tool.serverId);
@@ -82,7 +85,7 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
         if (typeof logMcpEvent === 'function') await logMcpEvent({ eventType: 'execution', serverId: server.id, serverName: server.name, toolName: tool.name, durationMs: execution.elapsedMs, success: true, message: `${tool.name} succeeded` });
     } catch (error) {
         execution.status = error.name === 'AbortError' ? 'timeout' : 'failed';
-        execution.error = error.name === 'AbortError' ? 'Tool call timed out' : (error.message || 'Tool call failed');
+        execution.error = error.name === 'AbortError' ? 'Tool call timed out' : formatMcpExecutionError(tool, args, error);
         execution.finishedAt = Date.now();
         execution.elapsedMs = execution.startedAt ? execution.finishedAt - execution.startedAt : 0;
         server.status = execution.status === 'timeout' ? 'timeout' : 'degraded';
@@ -98,6 +101,20 @@ async function executeMcpToolCall(qualifiedName, args = {}, options = {}) {
     }
 
     return execution;
+}
+
+function formatMcpExecutionError(tool, args = {}, error = {}) {
+    const message = error.message || 'Tool call failed';
+    const toolName = String(tool?.name || '');
+    const url = String(args?.url || '');
+    if (
+        (toolName.startsWith('browser_') || toolName.startsWith('puppeteer_'))
+        && /\blocalhost\b|127\.0\.0\.1|\[::1\]/i.test(url)
+        && /ERR_CONNECTION_REFUSED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|net::|timeout|Navigation timeout/i.test(message)
+    ) {
+        return 'Browser tool could not reach localhost. Try 127.0.0.1 or host.docker.internal depending on where the MCP browser runs.';
+    }
+    return message;
 }
 
 async function extractStructuredMcpResult(extracted, args = {}) {
@@ -131,6 +148,7 @@ async function extractStructuredMcpResult(extracted, args = {}) {
 }
 
 function buildToolResultApiMessage(execution) {
+    if (window.ArchitectMCP?.buildToolResultApiMessage) return window.ArchitectMCP.buildToolResultApiMessage(execution);
     let content;
     if (execution.status === 'success') {
         if (execution.result && typeof execution.result === 'object' && execution.result.requiresConfirmation) {

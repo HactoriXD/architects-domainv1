@@ -377,3 +377,203 @@
         display: none;
     }
 }
+
+/* Premium command deck polish */
+.header-controls {
+    gap: 8px;
+    min-width: 0;
+}
+
+.header-control-cluster {
+    gap: 5px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+        rgba(5, 5, 8, 0.58);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.035),
+        0 10px 26px rgba(0, 0, 0, 0.12);
+}
+
+.header-control-cluster + .header-control-cluster {
+    padding-left: 4px;
+    margin-left: 2px;
+}
+
+.header-control-cluster + .header-control-cluster::before {
+    left: -6px;
+    top: 10px;
+    bottom: 10px;
+    background: rgba(167, 139, 250, 0.12);
+}
+
+.generation-command-cluster:has(.deepseek-thinking-button[hidden]) {
+    display: none;
+}
+
+.header-controls .btn-icon {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 11px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)),
+        rgba(3, 3, 6, 0.72);
+    border-color: rgba(255, 255, 255, 0.065);
+    color: rgba(235, 229, 255, 0.54);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.header-controls .btn-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.header-control-cluster .btn:hover,
+.header-control-cluster .btn-icon:hover,
+.header-control-cluster .btn:focus-visible,
+.header-control-cluster .btn-icon:focus-visible {
+    background:
+        linear-gradient(180deg, rgba(167, 139, 250, 0.075), rgba(255, 255, 255, 0.018)),
+        rgba(8, 7, 12, 0.88);
+    border-color: rgba(167, 139, 250, 0.24);
+    color: rgba(255, 255, 255, 0.9);
+    box-shadow:
+        0 0 0 3px rgba(139, 92, 246, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.capability-command-cluster .btn-icon {
+    color: rgba(221, 214, 254, 0.62);
+}
+
+.utility-command-cluster .btn-icon {
+    color: rgba(235, 229, 255, 0.42);
+}
+
+.command-icon-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(167, 139, 250, 0.84);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: white;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 6px 14px rgba(76, 29, 149, 0.22);
+}
+
+.command-icon-badge[hidden] {
+    display: none;
+}
+
+.websearch-toggle {
+    height: 38px;
+    padding: 0 10px;
+    gap: 8px;
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)),
+        rgba(4, 4, 7, 0.7);
+    border-color: rgba(255, 255, 255, 0.065);
+    color: rgba(235, 229, 255, 0.55);
+}
+
+.websearch-toggle:hover {
+    background:
+        linear-gradient(180deg, rgba(167, 139, 250, 0.055), rgba(255, 255, 255, 0.014)),
+        rgba(6, 6, 10, 0.84);
+    border-color: rgba(167, 139, 250, 0.18);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255,255,255,0.045);
+}
+
+.websearch-toggle.active {
+    color: rgba(255, 255, 255, 0.92);
+    border-color: rgba(167, 139, 250, 0.34);
+    background:
+        linear-gradient(180deg, rgba(139, 92, 246, 0.13), rgba(139, 92, 246, 0.045)),
+        rgba(5, 5, 8, 0.78);
+    box-shadow:
+        0 10px 28px rgba(76, 29, 149, 0.16),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.websearch-toggle svg {
+    color: rgba(167, 139, 250, 0.78);
+}
+
+.websearch-toggle .toggle-track {
+    width: 30px;
+    height: 17px;
+    background: rgba(255, 255, 255, 0.055);
+    border-color: rgba(255, 255, 255, 0.09);
+}
+
+.websearch-toggle .toggle-track::after {
+    width: 11px;
+    height: 11px;
+    background: rgba(235, 229, 255, 0.42);
+}
+
+.websearch-toggle.active .toggle-track {
+    background: rgba(124, 58, 237, 0.5);
+    border-color: rgba(196, 181, 253, 0.36);
+}
+
+.websearch-toggle.active .toggle-track::after {
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.deepseek-thinking-button {
+    height: 36px;
+    min-width: 138px;
+    border-radius: 11px;
+    background:
+        linear-gradient(180deg, rgba(245, 158, 11, 0.055), rgba(255, 255, 255, 0.01)),
+        rgba(4, 4, 7, 0.78);
+    border-color: rgba(245, 158, 11, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.deepseek-thinking-button:hover {
+    box-shadow: 0 10px 24px rgba(245, 158, 11, 0.1), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+@media (max-width: 900px) {
+    .header-controls {
+        gap: 7px;
+    }
+
+    .header-control-cluster {
+        padding: 3px;
+    }
+}
+
+@media (max-width: 560px) {
+    .header-control-cluster {
+        gap: 4px;
+    }
+
+    .header-control-cluster + .header-control-cluster {
+        margin-left: 0;
+    }
+
+    .header-controls .btn-icon {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+    }
+}

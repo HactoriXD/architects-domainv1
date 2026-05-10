@@ -265,6 +265,7 @@
             providerSettings: state.providerSettings,
             providerStatus: state.providerStatus,
             mcpControl: {
+                enabled: Boolean(state.mcpControl.enabled),
                 toolCallingMode: state.mcpControl.toolCallingMode || 'native',
                 privacyMode: Boolean(state.mcpControl.privacyMode),
                 demoMode: Boolean(state.mcpControl.demoMode)
@@ -309,6 +310,7 @@
                 state.nanogptModelsCache = state.providerSettings.nanogpt.modelsCache;
                 if (d.providerStatus) state.providerStatus = d.providerStatus;
                 if (d.mcpControl) {
+                    state.mcpControl.enabled = Boolean(d.mcpControl.enabled);
                     state.mcpControl.toolCallingMode = ['native', 'xml', 'json', 'disabled'].includes(d.mcpControl.toolCallingMode) ? d.mcpControl.toolCallingMode : 'native';
                     state.mcpControl.privacyMode = Boolean(d.mcpControl.privacyMode);
                     state.mcpControl.demoMode = Boolean(d.mcpControl.demoMode);
@@ -335,6 +337,7 @@
             webSearchEnabled: state.webSearchEnabled,
             providerSettings: state.providerSettings,
             mcpControl: {
+                enabled: Boolean(state.mcpControl.enabled),
                 toolCallingMode: state.mcpControl.toolCallingMode || 'native',
                 privacyMode: Boolean(state.mcpControl.privacyMode),
                 demoMode: Boolean(state.mcpControl.demoMode)
@@ -368,6 +371,7 @@
             if (typeof payload.webSearchEnabled === 'boolean') state.webSearchEnabled = payload.webSearchEnabled;
             if (payload.providerSettings) state.providerSettings = payload.providerSettings;
             if (payload.mcpControl) {
+                state.mcpControl.enabled = Boolean(payload.mcpControl.enabled);
                 state.mcpControl.toolCallingMode = ['native', 'xml', 'json', 'disabled'].includes(payload.mcpControl.toolCallingMode) ? payload.mcpControl.toolCallingMode : state.mcpControl.toolCallingMode;
                 state.mcpControl.privacyMode = Boolean(payload.mcpControl.privacyMode);
                 state.mcpControl.demoMode = Boolean(payload.mcpControl.demoMode);

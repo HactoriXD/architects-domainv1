@@ -79,22 +79,24 @@
                 </div>
             </div>
             <div class="header-controls">
-                <button class="websearch-toggle" id="webSearchToggle" type="button" title="Toggle web search">
+                <button class="websearch-toggle" id="webSearchToggle" type="button" title="Toggle web search" aria-label="Websearch">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                     <span class="websearch-label">Websearch</span>
                     <span id="webSearchStatus">Off</span>
                     <span class="toggle-track" aria-hidden="true"></span>
                 </button>
-                <button class="deepseek-thinking-button" id="deepSeekThinkingButton" type="button" hidden title="Toggle thinking mode">
-                    <span class="thinking-orbit" aria-hidden="true"></span>
-                    <span class="thinking-copy">
-                        <span class="thinking-kicker" id="thinkingProviderLabel">Thinking</span>
-                        <span class="thinking-state" id="deepSeekThinkingButtonLabel">THINKING OFF</span>
-                    </span>
-                </button>
-                <div class="header-control-cluster">
+                <div class="header-control-cluster generation-command-cluster" aria-label="Generation controls">
+                    <button class="deepseek-thinking-button" id="deepSeekThinkingButton" type="button" hidden title="Toggle thinking mode" aria-label="Generation thinking mode">
+                        <span class="thinking-orbit" aria-hidden="true"></span>
+                        <span class="thinking-copy">
+                            <span class="thinking-kicker" id="thinkingProviderLabel">Thinking</span>
+                            <span class="thinking-state" id="deepSeekThinkingButtonLabel">THINKING OFF</span>
+                        </span>
+                    </button>
+                </div>
+                <div class="header-control-cluster capability-command-cluster" aria-label="Context and capability controls">
                     <div class="context-toggle">
-                        <button class="btn btn-icon" id="contextInspectorBtn" title="Context sources"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="8" cy="7" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="17" r="1"/></svg></button>
+                        <button class="btn btn-icon" id="contextInspectorBtn" type="button" title="Context sources" aria-label="Context sources" aria-haspopup="dialog"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="8" cy="7" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="17" r="1"/></svg></button>
                         <div class="context-inspector-panel" id="contextInspectorPanel">
                             <div class="context-inspector-header">
                                 <h3 class="settings-title">Context Sources</h3>
@@ -103,15 +105,14 @@
                             <div class="context-sources-list" id="contextSourcesList"></div>
                         </div>
                     </div>
+                    <button class="btn btn-icon" id="mcpControlCenterBtn" type="button" title="MCP Control Center" aria-label="MCP Tools"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M8.6 7.6 10.8 15"/><path d="M15.4 7.6 13.2 15"/><path d="M9 6h6"/></svg><span class="command-icon-badge" id="mcpControlBadge" hidden></span></button>
+                    <span class="mcp-status-pill off" id="mcpStatusPill" title="MCP tools are experimental and disabled by default">MCP: Off</span>
+                    <button class="btn btn-icon" id="memoryManagerBtn" type="button" title="Memory manager" aria-label="Memory manager"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 4 6v3h6v-3c2-1 4-3 4-6a7 7 0 0 0-7-7z"/><path d="M9 21h6"/><path d="M10 10h4"/></svg></button>
                 </div>
-                <div class="header-control-cluster">
-                    <button class="btn btn-icon" id="mcpControlCenterBtn" title="MCP Control Center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M8.6 7.6 10.8 15"/><path d="M15.4 7.6 13.2 15"/><path d="M9 6h6"/></svg></button>
-                </div>
-                <div class="header-control-cluster">
-                    <button class="btn btn-icon" id="memoryManagerBtn" title="Memory manager"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a7 7 0 0 0-7 7c0 3 2 5 4 6v3h6v-3c2-1 4-3 4-6a7 7 0 0 0-7-7z"/><path d="M9 21h6"/><path d="M10 10h4"/></svg></button>
+                <div class="header-control-cluster utility-command-cluster" aria-label="Utility controls">
                     <!-- Export -->
                     <div class="export-toggle">
-                        <button class="btn btn-icon" id="exportBtn" title="Export chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                        <button class="btn btn-icon" id="exportBtn" type="button" title="Export chat" aria-label="Export chat" aria-haspopup="menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
                         <div class="export-panel" id="exportPanel">
                             <h3 class="settings-title">Export Chat</h3>
                             <button class="export-option" onclick="exportAsMarkdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Markdown (.md)</button>
@@ -120,13 +121,11 @@
                             <button class="export-option" onclick="exportAsHTML()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>HTML (.html)</button>
                         </div>
                     </div>
-                </div>
-                <div class="header-control-cluster">
                     <!-- Keyboard shortcuts -->
-                    <button class="btn btn-icon" id="shortcutsBtn" title="Keyboard shortcuts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><path d="M7 8h.01"/><path d="M11 8h.01"/><path d="M15 8h.01"/><path d="M17 12H7"/></svg></button>
+                    <button class="btn btn-icon" id="shortcutsBtn" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><path d="M7 8h.01"/><path d="M11 8h.01"/><path d="M15 8h.01"/><path d="M17 12H7"/></svg></button>
                     <!-- Settings -->
                     <div class="settings-toggle">
-                        <button class="btn btn-icon" id="settingsBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                        <button class="btn btn-icon" id="settingsBtn" type="button" title="Settings" aria-label="Settings" aria-haspopup="dialog"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
                     <div class="settings-panel" id="settingsPanel">
                         <h3 class="settings-title">Providers</h3>
                         <div class="settings-group">
@@ -183,6 +182,15 @@
                                 <button class="btn" id="dataManagerBtn" type="button">Open Data Manager</button>
                             </div>
                             <div class="settings-hint">Export, import, reset, or clear browser-local chats, memories, workspaces, MCP servers, and keys.</div>
+                        </div>
+                        <div class="settings-divider"></div>
+                        <h3 class="settings-title">Experimental</h3>
+                        <div class="settings-group">
+                            <label class="settings-check-row" for="mcpEnabledToggle">
+                                <input type="checkbox" id="mcpEnabledToggle">
+                                <span><strong>Enable MCP Tools</strong><small>Optional local tool servers for browser, filesystem, memory, and other MCP workflows.</small></span>
+                            </label>
+                            <div class="settings-hint">Default off. When disabled, tool-call markup is still stripped from chat, but MCP commands and server checks stay inactive.</div>
                         </div>
                         <div class="settings-divider"></div>
                         <h3 class="settings-title">Generation Settings</h3>
@@ -249,7 +257,7 @@
                     <textarea class="system-prompt-textarea" id="systemPrompt" placeholder="Set behavior, tone, boundaries, and context for this workspace..."></textarea>
                     <div class="system-prompt-footer">
                         <div class="system-prompt-stats"><span id="systemPromptWordCount">0</span> words &middot; <span id="systemPromptCharCount">0</span> chars</div>
-                        <div style="display:flex;align-items:center;gap:12px">
+                        <div class="system-prompt-footer-actions">
                             <div class="system-prompt-saved" id="systemPromptSaved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>Saved</span></div>
                             <div class="system-prompt-actions">
                                 <button class="btn" id="systemPromptClear"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
@@ -647,6 +655,12 @@
     <script src="scripts/mcp/permissions.js" defer></script>
     <script src="scripts/mcp/tool-executor.js" defer></script>
     <script src="scripts/mcp/tool-router.js" defer></script>
+    <script src="scripts/mcp/host.js" defer></script>
+    <script src="scripts/mcp/parser.js" defer></script>
+    <script src="scripts/mcp/commands.js" defer></script>
+    <script src="scripts/mcp/executor.js" defer></script>
+    <script src="scripts/mcp/renderer.js" defer></script>
+    <script src="scripts/mcp/health.js" defer></script>
     <script src="scripts/mcp/prompt-injection.js" defer></script>
     <script src="scripts/mcp/client.js" defer></script>
     <script src="scripts/mcp/manager.js" defer></script>

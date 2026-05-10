@@ -365,7 +365,10 @@
 
     function updateSendButton() {
         const hasContent = el.messageInput.value.trim().length > 0 || state.attachments.length > 0;
-        el.sendBtn.disabled = !hasContent || state.isStreaming || !state.selectedModel;
+        const directMcpCommand = typeof parseMcpDirectCommand === 'function'
+            ? parseMcpDirectCommand(el.messageInput.value.trim())
+            : { handled: false };
+        el.sendBtn.disabled = !hasContent || state.isStreaming || (!state.selectedModel && !directMcpCommand.handled);
     }
 
     function isNearMessageBottom(threshold = 100) {
