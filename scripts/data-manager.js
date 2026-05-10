@@ -29,18 +29,20 @@ function getStorageSnapshot() {
         const value = localStorage.getItem(key);
         if (value !== null) values[key] = value;
     });
-    redactGroqKeyFromPlainStorageSnapshot(values);
+    redactProviderKeysFromPlainStorageSnapshot(values);
     return values;
 }
 
-function redactGroqKeyFromPlainStorageSnapshot(values) {
+function redactProviderKeysFromPlainStorageSnapshot(values) {
     const rawSettings = values[CONFIG.SETTINGS_KEY];
     if (!rawSettings) return;
     try {
         const settings = JSON.parse(rawSettings);
-        if (settings?.apiKeys?.groq) {
+        if (settings?.apiKeys?.groq || settings?.apiKeys?.nanogpt || settings?.nanogptApiKey) {
             settings.apiKeys = { ...settings.apiKeys };
             delete settings.apiKeys.groq;
+            delete settings.apiKeys.nanogpt;
+            delete settings.nanogptApiKey;
             values[CONFIG.SETTINGS_KEY] = JSON.stringify(settings);
         }
     } catch (e) {

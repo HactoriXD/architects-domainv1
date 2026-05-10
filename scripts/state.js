@@ -45,7 +45,8 @@
     const PROVIDER_PRICING_ESTIMATES_USD_PER_1M = {
         deepseek: { input: 0.27, output: 1.10 },
         venice: { input: 0.50, output: 2.00 },
-        openrouter: { input: 0, output: 0 }
+        openrouter: { input: 0, output: 0 },
+        nanogpt: { input: 0, output: 0 }
     };
 
     // ============================================
@@ -90,6 +91,13 @@
         activeStream: null,
         providerStatus: {},
         providerSettings: {},
+        nanogptApiKey: '',
+        nanogptMode: 'standard',
+        nanogptSelectedModel: '',
+        nanogptOnlineEnabled: false,
+        nanogptMemoryEnabled: false,
+        nanogptModelsCache: { standard: [], subscription: [], paid: [] },
+        nanogptModelsFetchedAt: 0,
         settings: { temperature: 0.7, maxTokens: 8192, topP: 1.0, topK: 0, frequencyPenalty: 0, presencePenalty: 0 }
     };
 
@@ -145,6 +153,12 @@
         providerStatus: document.getElementById('providerStatus'),
         testProviderBtn: document.getElementById('testProviderBtn'),
         clearLocalKeysBtn: document.getElementById('clearLocalKeysBtn'),
+        refreshModelsBtn: document.getElementById('refreshModelsBtn'),
+        nanoGptSettingsGroup: document.getElementById('nanoGptSettingsGroup'),
+        nanoGptModeSelect: document.getElementById('nanoGptModeSelect'),
+        nanoGptOnlineToggle: document.getElementById('nanoGptOnlineToggle'),
+        nanoGptMemoryToggle: document.getElementById('nanoGptMemoryToggle'),
+        nanoGptModelPreview: document.getElementById('nanoGptModelPreview'),
         exportSettingsBtn: document.getElementById('exportSettingsBtn'),
         importSettingsBtn: document.getElementById('importSettingsBtn'),
         settingsImportInput: document.getElementById('settingsImportInput'),
@@ -516,6 +530,15 @@
         }
         if (providerId === 'groq') {
             return GROQ_CURATED_MODELS.map(model => normalizeModel(providerId, model));
+        }
+        if (providerId === 'nanogpt') {
+            return NANOGPT_FALLBACK_MODELS.map(model => normalizeModel(providerId, {
+                ...model,
+                name: `NanoGPT · ${model.name}`,
+                fallback: true,
+                capabilities: { streaming: true },
+                pricing_note: 'Provider pricing'
+            }));
         }
         return [];
     }

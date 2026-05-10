@@ -188,6 +188,7 @@ Supported providers:
 
 - OpenRouter
 - Groq
+- NanoGPT
 - DeepSeek
 - Venice.ai
 
@@ -200,6 +201,18 @@ Groq support uses GroqCloud's OpenAI-compatible API:
 - Auth: `Authorization: Bearer <GROQ_API_KEY>`
 
 Add a Groq API key in Settings after creating one in the GroqCloud console. The key is stored locally in browser storage, just like the other provider keys. The Groq model list is curated from Groq's public model documentation and can change as Groq updates model availability; pricing is shown only when exact local metadata is present, otherwise the UI points to provider pricing.
+
+### NanoGPT
+
+NanoGPT support uses NanoGPT's OpenAI-compatible API with dynamic model fetching:
+
+- Standard models: `https://nano-gpt.com/api/v1/models?detailed=true`
+- Subscription models: `https://nano-gpt.com/api/subscription/v1/models?detailed=true`
+- Paid/extras models: `https://nano-gpt.com/api/paid/v1/models?detailed=true`
+- Chat endpoint: standard and paid modes use `/api/v1/chat/completions`; subscription mode uses `/api/subscription/v1/chat/completions`
+- Auth: `Authorization: Bearer <NANOGPT_API_KEY>`
+
+NanoGPT settings include provider mode selection plus optional `:online` and `:memory` model suffix controls. If live model fetching fails, the app shows a small marked fallback list instead of pretending those models were fetched.
 
 ## Hosting
 

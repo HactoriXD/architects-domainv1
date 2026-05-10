@@ -252,6 +252,13 @@
         try { const serialized = JSON.stringify({
             provider: state.provider,
             apiKeys: state.apiKeys,
+            nanogptApiKey: state.apiKeys.nanogpt || '',
+            nanogptMode: state.nanogptMode,
+            nanogptSelectedModel: state.providerSettings.nanogpt?.selectedModelId || state.nanogptSelectedModel || '',
+            nanogptOnlineEnabled: state.nanogptOnlineEnabled,
+            nanogptMemoryEnabled: state.nanogptMemoryEnabled,
+            nanogptModelsCache: typeof normalizeNanoGptModelsCache === 'function' ? normalizeNanoGptModelsCache(state.nanogptModelsCache) : state.nanogptModelsCache,
+            nanogptModelsFetchedAt: state.nanogptModelsFetchedAt,
             selectedModelId: state.selectedModel?.id,
             activeWorkspaceId: state.activeWorkspaceId,
             webSearchEnabled: state.webSearchEnabled,
@@ -276,9 +283,30 @@
                 const d = JSON.parse(saved);
                 if (d.provider && PROVIDERS[d.provider]) state.provider = d.provider;
                 if (d.apiKeys) state.apiKeys = d.apiKeys;
+                if (d.nanogptApiKey && !state.apiKeys.nanogpt) state.apiKeys.nanogpt = d.nanogptApiKey;
+                if (d.nanogptMode) state.nanogptMode = ['standard', 'subscription', 'paid'].includes(d.nanogptMode) ? d.nanogptMode : 'standard';
+                if (d.nanogptSelectedModel) state.nanogptSelectedModel = d.nanogptSelectedModel;
+                if (typeof d.nanogptOnlineEnabled === 'boolean') state.nanogptOnlineEnabled = d.nanogptOnlineEnabled;
+                if (typeof d.nanogptMemoryEnabled === 'boolean') state.nanogptMemoryEnabled = d.nanogptMemoryEnabled;
+                if (d.nanogptModelsCache) {
+                    state.nanogptModelsCache = typeof normalizeNanoGptModelsCache === 'function'
+                        ? normalizeNanoGptModelsCache(d.nanogptModelsCache)
+                        : d.nanogptModelsCache;
+                }
+                if (Number.isFinite(Number(d.nanogptModelsFetchedAt))) state.nanogptModelsFetchedAt = Number(d.nanogptModelsFetchedAt);
                 if (d.activeWorkspaceId) state.activeWorkspaceId = d.activeWorkspaceId;
                 if (typeof d.webSearchEnabled === 'boolean') state.webSearchEnabled = d.webSearchEnabled;
                 if (d.providerSettings) state.providerSettings = d.providerSettings;
+                state.providerSettings.nanogpt = {
+                    ...(state.providerSettings.nanogpt || {}),
+                    mode: state.providerSettings.nanogpt?.mode || state.nanogptMode || 'standard',
+                    selectedModelId: state.providerSettings.nanogpt?.selectedModelId || state.nanogptSelectedModel || null,
+                    modelsCache: typeof normalizeNanoGptModelsCache === 'function'
+                        ? normalizeNanoGptModelsCache(state.providerSettings.nanogpt?.modelsCache || state.nanogptModelsCache)
+                        : (state.providerSettings.nanogpt?.modelsCache || state.nanogptModelsCache || { standard: [], subscription: [], paid: [] }),
+                    modelsFetchedAt: state.providerSettings.nanogpt?.modelsFetchedAt || state.nanogptModelsFetchedAt || 0
+                };
+                state.nanogptModelsCache = state.providerSettings.nanogpt.modelsCache;
                 if (d.providerStatus) state.providerStatus = d.providerStatus;
                 if (d.mcpControl) {
                     state.mcpControl.toolCallingMode = ['native', 'xml', 'json', 'disabled'].includes(d.mcpControl.toolCallingMode) ? d.mcpControl.toolCallingMode : 'native';
@@ -300,6 +328,10 @@
             exportedAt: new Date().toISOString(),
             provider: state.provider,
             apiKeys: state.apiKeys,
+            nanogptMode: state.nanogptMode,
+            nanogptSelectedModel: state.providerSettings.nanogpt?.selectedModelId || state.nanogptSelectedModel || '',
+            nanogptOnlineEnabled: state.nanogptOnlineEnabled,
+            nanogptMemoryEnabled: state.nanogptMemoryEnabled,
             webSearchEnabled: state.webSearchEnabled,
             providerSettings: state.providerSettings,
             mcpControl: {
@@ -328,6 +360,10 @@
             const payload = await decryptJson(encrypted, passphrase);
             if (!payload || payload.version !== 1) throw new Error('Unsupported settings backup');
             if (payload.apiKeys) state.apiKeys = payload.apiKeys;
+            if (payload.nanogptMode) state.nanogptMode = ['standard', 'subscription', 'paid'].includes(payload.nanogptMode) ? payload.nanogptMode : state.nanogptMode;
+            if (payload.nanogptSelectedModel) state.nanogptSelectedModel = payload.nanogptSelectedModel;
+            if (typeof payload.nanogptOnlineEnabled === 'boolean') state.nanogptOnlineEnabled = payload.nanogptOnlineEnabled;
+            if (typeof payload.nanogptMemoryEnabled === 'boolean') state.nanogptMemoryEnabled = payload.nanogptMemoryEnabled;
             if (payload.provider && PROVIDERS[payload.provider]) state.provider = payload.provider;
             if (typeof payload.webSearchEnabled === 'boolean') state.webSearchEnabled = payload.webSearchEnabled;
             if (payload.providerSettings) state.providerSettings = payload.providerSettings;

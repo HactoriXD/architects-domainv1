@@ -134,6 +134,7 @@
                             <select class="settings-select" id="providerSelect">
                                 <option value="openrouter">OpenRouter</option>
                                 <option value="groq">Groq</option>
+                                <option value="nanogpt">NanoGPT</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="venice">Venice.ai</option>
                             </select>
@@ -145,8 +146,27 @@
                             <div class="settings-hint" id="apiKeyHint">Your API keys remain locally stored in your browser and are sent directly to the selected provider.</div>
                             <div class="provider-actions">
                                 <button class="btn" id="testProviderBtn" type="button">Test Connection</button>
+                                <button class="btn" id="refreshModelsBtn" type="button">Refresh Models</button>
                                 <button class="btn" id="clearLocalKeysBtn" type="button">Clear Local Keys</button>
                             </div>
+                        </div>
+                        <div class="settings-group nanogpt-settings-group" id="nanoGptSettingsGroup" hidden>
+                            <div class="settings-label"><span>NanoGPT Mode</span></div>
+                            <select class="settings-select" id="nanoGptModeSelect">
+                                <option value="standard">Standard / Visible Models</option>
+                                <option value="subscription">Subscription Only</option>
+                                <option value="paid">Paid / Extras</option>
+                            </select>
+                            <div class="settings-hint">NanoGPT is OpenAI-compatible. Subscription mode uses NanoGPT’s subscription endpoint.</div>
+                            <label class="settings-check-row" for="nanoGptOnlineToggle">
+                                <input type="checkbox" id="nanoGptOnlineToggle">
+                                <span><strong>Online Search suffix</strong><small>Append :online to compatible NanoGPT model IDs.</small></span>
+                            </label>
+                            <label class="settings-check-row" for="nanoGptMemoryToggle">
+                                <input type="checkbox" id="nanoGptMemoryToggle">
+                                <span><strong>Memory suffix</strong><small>Append :memory to compatible NanoGPT model IDs.</small></span>
+                            </label>
+                            <div class="settings-hint">Final model id: <code id="nanoGptModelPreview">Select a NanoGPT model</code></div>
                         </div>
                         <div class="settings-group">
                             <div class="settings-label"><span>Settings Backup</span></div>

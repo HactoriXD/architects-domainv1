@@ -341,13 +341,8 @@ function renderMessages() {
                     ? formatMessageContent(reasoning, false, true)
                     : formatMessageContent('Waiting for visible thinking from the provider...', false, true);
             }
-            if (pendingStreamingContent.includes('```')) {
-                body.style.whiteSpace = '';
-                body.innerHTML = formatMessageContent(pendingStreamingContent, false, true);
-            } else {
-                body.style.whiteSpace = 'pre-wrap';
-                body.textContent = pendingStreamingContent;
-            }
+            body.style.whiteSpace = '';
+            body.innerHTML = formatMessageContent(pendingStreamingContent, false, true);
             if (shouldFollowStream) {
                 scrollToBottom({ behavior: 'auto' });
             } else {

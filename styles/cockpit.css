@@ -187,6 +187,7 @@
         }
         .model-badge.free { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
         .model-badge.groq { background: rgba(249, 115, 22, 0.16); color: #fdba74; }
+        .model-badge.nanogpt { background: rgba(34, 211, 238, 0.14); color: #67e8f9; }
         .model-badge.reasoning { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
         .model-badge.coding { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
         .model-badge.roleplay { background: rgba(236, 72, 153, 0.16); color: #f9a8d4; }

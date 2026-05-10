@@ -1,0 +1,27 @@
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/data-manager.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/markdown.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/providers.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/renderer.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/shortcuts.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/state.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/storage.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/stream.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles/chat.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles/cockpit.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles/sidebar.css', LF will be replaced by CRLF the next time Git touches it
+ README.md               |  13 [32m++[m
+ index.html              |  20 [32m++[m
+ scripts/data-manager.js |   8 [32m+[m[31m-[m
+ scripts/markdown.js     | 164 [32m+++++++++++++[m[31m--[m
+ scripts/providers.js    | 232 [32m++++++++++++++++++++[m[31m-[m
+ scripts/renderer.js     |   9 [32m+[m[31m-[m
+ scripts/shortcuts.js    |  35 [32m++++[m
+ scripts/state.js        |  25 [32m++[m[31m-[m
+ scripts/storage.js      |  36 [32m++++[m
+ scripts/stream.js       |  68 [32m+++++[m[31m-[m
+ styles/chat.css         | 533 [32m++++++++++++++++++++++++++++++++++++++++++++++++[m
+ styles/cockpit.css      |   1 [32m+[m
+ styles/sidebar.css      | 462 [32m+++++++++++++++++++++++++++++++++++++++++[m
+ 13 files changed, 1561 insertions(+), 45 deletions(-)

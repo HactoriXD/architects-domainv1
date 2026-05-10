@@ -24,6 +24,19 @@ const PROVIDERS = {
             apiKeyHint: 'Used for GroqCloud\'s OpenAI-compatible endpoint. Stored locally.',
             priority: ['llama-3.3', 'openai', 'qwen', 'meta-llama', 'groq']
         },
+        nanogpt: {
+            label: 'NanoGPT',
+            badge: 'NanoGPT · OpenAI-compatible',
+            apiBase: 'https://nano-gpt.com/api/v1',
+            defaultModel: 'openai/gpt-5.2',
+            supportsWebSearch: false,
+            searchMode: 'none',
+            supportsNativeTools: false,
+            apiKeyLabel: 'NanoGPT API Key',
+            apiKeyPlaceholder: 'ngpt_... or NanoGPT API key',
+            apiKeyHint: 'NanoGPT is OpenAI-compatible. Subscription mode uses NanoGPT’s subscription endpoint.',
+            priority: ['openai', 'anthropic', 'google', 'minimax', 'qwen']
+        },
         deepseek: {
             label: 'DeepSeek',
             apiBase: 'https://api.deepseek.com',
@@ -61,6 +74,15 @@ const PROVIDERS = {
         { id: 'groq/compound-mini', name: 'Groq Compound Mini', context_length: 131072, max_completion_tokens: 8192, tags: ['fast'], capabilities: { streaming: true, tools: false }, pricing_note: 'Provider pricing' }
     ];
 
+    const NANOGPT_FALLBACK_MODELS = [
+        { id: 'openai/gpt-5.2', name: 'GPT-5.2' },
+        { id: 'openai/gpt-5.2-chat-latest', name: 'GPT-5.2 Chat Latest' },
+        { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6' },
+        { id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+        { id: 'minimax/minimax-m2.7', name: 'MiniMax M2.7' },
+        { id: 'qwen/qwen3-coder-plus', name: 'Qwen3 Coder Plus' }
+    ];
+
 // Model Management
     // ============================================
     async function fetchOpenRouterCategoryIds(category) {
@@ -86,12 +108,156 @@ const PROVIDERS = {
         return [...byId.values()];
     }
 
+    function getNanoGptMode() {
+        const mode = state.providerSettings.nanogpt?.mode || state.nanogptMode || 'standard';
+        return ['standard', 'subscription', 'paid'].includes(mode) ? mode : 'standard';
+    }
+
+    function getNanoGptApiBase(mode = getNanoGptMode()) {
+        if (mode === 'subscription') return 'https://nano-gpt.com/api/subscription/v1';
+        if (mode === 'paid') return 'https://nano-gpt.com/api/paid/v1';
+        return 'https://nano-gpt.com/api/v1';
+    }
+
+    function getProviderModelsUrl(providerId = state.provider, mode = getNanoGptMode()) {
+        if (providerId === 'nanogpt') return `${getNanoGptApiBase(mode)}/models?detailed=true`;
+        return `${getProvider().apiBase}/models`;
+    }
+
+    function getProviderChatUrl(providerId = state.provider) {
+        if (providerId === 'nanogpt') {
+            return getNanoGptMode() === 'subscription'
+                ? 'https://nano-gpt.com/api/subscription/v1/chat/completions'
+                : 'https://nano-gpt.com/api/v1/chat/completions';
+        }
+        return `${getProvider().apiBase}/chat/completions`;
+    }
+
+    function normalizeNanoGptModel(model) {
+        const id = model.id || model.model || model.name;
+        const rawName = model.name || model.display_name || model.title || id;
+        const providerName = model.owned_by || model.provider || model.vendor || String(id || '').split('/')[0] || 'NanoGPT';
+        const maxOutput = model.max_output_tokens || model.max_completion_tokens || model.max_tokens || model.output_limit || null;
+        return {
+            ...model,
+            id,
+            name: `NanoGPT · ${String(rawName || id).replace(/^NanoGPT\s*·\s*/i, '').trim()}`,
+            owned_by: model.owned_by || providerName,
+            provider_name: providerName,
+            description: model.description || model.short_description || '',
+            context_length: model.context_length || model.contextLength || model.context_window || model.max_context_length || 0,
+            max_completion_tokens: maxOutput,
+            max_output_tokens: maxOutput,
+            capabilities: model.capabilities || {},
+            pricing: model.pricing || model.cost_estimate || {},
+            category: model.category || model.type || providerName,
+            cost_estimate: model.cost_estimate || null,
+            tags: Array.isArray(model.tags) ? model.tags : [providerName, model.category].filter(Boolean),
+            pricing_note: model.pricing || model.cost_estimate ? null : 'Provider pricing'
+        };
+    }
+
+    function normalizeNanoGptModelsCache(cache = state.nanogptModelsCache) {
+        const empty = { standard: [], subscription: [], paid: [] };
+        if (Array.isArray(cache)) return { ...empty, standard: cache };
+        if (!cache || typeof cache !== 'object') return empty;
+        return {
+            standard: Array.isArray(cache.standard) ? cache.standard : [],
+            subscription: Array.isArray(cache.subscription) ? cache.subscription : [],
+            paid: Array.isArray(cache.paid) ? cache.paid : []
+        };
+    }
+
+    function getNanoGptModeModels(mode = getNanoGptMode()) {
+        state.nanogptModelsCache = normalizeNanoGptModelsCache();
+        return state.nanogptModelsCache[mode] || [];
+    }
+
+    function getNanoGptModeLabel(mode = getNanoGptMode()) {
+        if (mode === 'subscription') return 'NanoGPT Subscription';
+        if (mode === 'paid') return 'NanoGPT Paid';
+        return 'NanoGPT';
+    }
+
+    function labelNanoGptModelForMode(model, mode = getNanoGptMode()) {
+        const label = getNanoGptModeLabel(mode);
+        const rawName = String(model.name || model.id || '').replace(/^NanoGPT(?:\s+Subscription|\s+Paid)?\s*[·Â]\s*/i, '').trim();
+        return { ...model, name: `${label} · ${rawName}`, nanogptMode: mode };
+    }
+
+    function applyNanoGptModelCache(models, mode = getNanoGptMode()) {
+        state.nanogptModelsCache = normalizeNanoGptModelsCache();
+        state.nanogptModelsCache[mode] = models.map(model => labelNanoGptModelForMode(model, mode));
+        state.nanogptModelsFetchedAt = Date.now();
+        state.providerSettings.nanogpt = {
+            ...(state.providerSettings.nanogpt || {}),
+            mode,
+            modelsCache: state.nanogptModelsCache,
+            modelsFetchedAt: state.nanogptModelsFetchedAt
+        };
+    }
+
+    function validateNanoGptSelectionForMode(mode = getNanoGptMode(), options = {}) {
+        if (state.provider !== 'nanogpt') return true;
+        const models = getNanoGptModeModels(mode);
+        state.models = [...models];
+        if (!models.length) {
+            state.selectedModel = null;
+            state.nanogptSelectedModel = '';
+            state.providerSettings.nanogpt = {
+                ...(state.providerSettings.nanogpt || {}),
+                selectedModelId: null,
+                mode
+            };
+            if (el.selectedModelName) el.selectedModelName.textContent = 'No models';
+            renderModelList([]);
+            updateNanoGptSettingsUI();
+            updateSendButton();
+            if (options.warn) showToast('No NanoGPT subscription models found. Refresh models or check your subscription/API key.', 'error');
+            return false;
+        }
+        const selectedId = state.selectedModel?.provider === 'nanogpt' ? state.selectedModel.id : state.providerSettings.nanogpt?.selectedModelId;
+        const selected = models.find(model => model.id === selectedId);
+        selectModel(selected || models[0]);
+        renderModelList(models);
+        return true;
+    }
+
+    function canSendNanoGptSelection() {
+        if (state.provider !== 'nanogpt' || getNanoGptMode() !== 'subscription') return true;
+        const selectedId = state.selectedModel?.id;
+        return Boolean(selectedId && getNanoGptModeModels('subscription').some(model => model.id === selectedId));
+    }
+
+    function buildNanoGptModelId(modelId = state.selectedModel?.id) {
+        let id = String(modelId || '');
+        if (!id || state.provider !== 'nanogpt') return id;
+        const parts = id.split(':');
+        const base = parts.shift();
+        const suffixes = new Set(parts.filter(Boolean));
+        if (state.nanogptOnlineEnabled) suffixes.add('online');
+        if (state.nanogptMemoryEnabled) suffixes.add('memory');
+        return [base, ...suffixes].join(':');
+    }
+
+    function updateNanoGptSettingsUI() {
+        const visible = state.provider === 'nanogpt';
+        if (el.nanoGptSettingsGroup) el.nanoGptSettingsGroup.hidden = !visible;
+        if (!visible) return;
+        state.nanogptModelsCache = normalizeNanoGptModelsCache();
+        if (el.nanoGptModeSelect) el.nanoGptModeSelect.value = getNanoGptMode();
+        if (el.nanoGptOnlineToggle) el.nanoGptOnlineToggle.checked = Boolean(state.nanogptOnlineEnabled);
+        if (el.nanoGptMemoryToggle) el.nanoGptMemoryToggle.checked = Boolean(state.nanogptMemoryEnabled);
+        if (el.nanoGptModelPreview) el.nanoGptModelPreview.textContent = buildNanoGptModelId() || 'Select a NanoGPT model';
+    }
+
     async function fetchModels() {
         const provider = getProvider();
+        const nanoGptMode = state.provider === 'nanogpt' ? getNanoGptMode() : null;
         try {
             el.selectedModelName.textContent = `Loading ${provider.label}...`;
             el.modelList.innerHTML = '<div class="loading-models"><div class="spinner"></div><span>Loading models...</span></div>';
-            if (!getApiKey() && state.provider !== 'openrouter') {
+            if (!getApiKey() && !['openrouter', 'nanogpt'].includes(state.provider)) {
                 state.models = buildFallbackModels(state.provider);
                 state.modelCategories.roleplay = new Set();
                 state.modelCategories.coding = new Set();
@@ -110,16 +276,20 @@ const PROVIDERS = {
                 el.modelList.insertAdjacentHTML('afterbegin', `<div class="loading-models provider-empty-state">${missingCopy}</div>`);
                 return;
             }
-            const response = await fetch(`${provider.apiBase}/models`, { headers: getAuthHeaders(false) });
+            const response = await fetch(getProviderModelsUrl(), { headers: getAuthHeaders(false) });
             if (!response.ok) throw new Error('Failed to fetch models');
             const data = await response.json();
-            state.models = mergeProviderModelsWithCurated(state.provider, data.data || []).map(m => normalizeModel(state.provider, m)).filter(m => m.id).sort((a, b) => {
+            const providerModels = state.provider === 'nanogpt'
+                ? (data.data || []).map(normalizeNanoGptModel).map(model => labelNanoGptModelForMode(model, nanoGptMode))
+                : mergeProviderModelsWithCurated(state.provider, data.data || []);
+            state.models = providerModels.map(m => normalizeModel(state.provider, m)).filter(m => m.id).sort((a, b) => {
                 const priority = provider.priority || [];
                 const aP = priority.indexOf(a.id.split('/')[0]), bP = priority.indexOf(b.id.split('/')[0]);
                 if (aP !== -1 && bP !== -1) return aP - bP;
                 if (aP !== -1) return -1; if (bP !== -1) return 1;
                 return a.id.localeCompare(b.id);
             });
+            if (state.provider === 'nanogpt') applyNanoGptModelCache(state.models, nanoGptMode);
             if (state.provider === 'openrouter') {
                 const [roleplayIds, codingIds] = await Promise.all([
                     fetchOpenRouterCategoryIds('roleplay'),
@@ -131,17 +301,30 @@ const PROVIDERS = {
                 state.modelCategories.roleplay = new Set();
                 state.modelCategories.coding = new Set();
             }
-            renderModelList(state.models);
+            if (state.provider === 'nanogpt') {
+                if (!validateNanoGptSelectionForMode(nanoGptMode, { warn: nanoGptMode === 'subscription' })) return;
+            } else {
+                renderModelList(state.models);
+            }
             const savedId = state.selectedModel?.provider === state.provider ? state.selectedModel.id : loadSettings();
             const model = state.models.find(m => m.id === savedId) || state.models.find(m => m.id === provider.defaultModel) || state.models[0];
-            if (model) selectModel(model);
+            if (model && state.provider !== 'nanogpt') selectModel(model);
             setProviderStatus(state.provider, getApiKey() ? 'connected' : 'untested');
         } catch (error) {
             console.error('Error:', error);
             setProviderStatus(state.provider, getApiKey() ? 'error' : 'untested');
             state.modelCategories.roleplay = new Set();
             state.modelCategories.coding = new Set();
+            if (state.provider === 'nanogpt' && nanoGptMode === 'subscription') {
+                applyNanoGptModelCache([], nanoGptMode);
+                validateNanoGptSelectionForMode(nanoGptMode, { warn: true });
+                return;
+            }
             state.models = buildFallbackModels(state.provider);
+            if (state.provider === 'nanogpt') {
+                applyNanoGptModelCache(state.models, nanoGptMode);
+                state.models = getNanoGptModeModels(nanoGptMode);
+            }
             if (state.models.length) {
                 renderModelList(state.models);
                 selectModel(state.models[0]);
@@ -156,7 +339,13 @@ const PROVIDERS = {
     }
 
     function renderModelList(models) {
-        if (models.length === 0) { el.modelList.innerHTML = '<div class="loading-models">No models found</div>'; return; }
+        if (models.length === 0) {
+            const message = state.provider === 'nanogpt' && getNanoGptMode() === 'subscription'
+                ? 'No NanoGPT subscription models found. Refresh models or check your subscription/API key.'
+                : 'No models found';
+            el.modelList.innerHTML = `<div class="loading-models">${escapeHtml(message)}</div>`;
+            return;
+        }
         const filteredModels = state.modelFilter === 'all' ? models : models.filter(m => getModelTraits(m)[state.modelFilter]);
         if (filteredModels.length === 0) { el.modelList.innerHTML = '<div class="loading-models">No models match this filter</div>'; return; }
         const renderItems = (items) => items.map(m => {
@@ -166,7 +355,11 @@ const PROVIDERS = {
             const traits = getModelTraits(m);
             const modelId = escapeHtml(m.id);
             const modelName = escapeHtml(m.name || m.id);
-            const providerBadge = state.provider === 'groq' ? '<span class="model-badge groq">GroqCloud</span>' : '';
+            const providerBadge = state.provider === 'groq'
+                ? '<span class="model-badge groq">GroqCloud</span>'
+                : state.provider === 'nanogpt'
+                    ? `<span class="model-badge nanogpt">${m.fallback ? 'Fallback' : 'NanoGPT'}</span>`
+                    : '';
             const badges = [
                 traits.free ? '<span class="model-badge free">Free</span>' : (state.provider === 'openrouter' ? '<span class="model-badge paid">Paid</span>' : ''),
                 providerBadge,
@@ -209,6 +402,7 @@ const PROVIDERS = {
             selectedModelId: model.id,
             settings: { ...state.settings }
         };
+        if (state.provider === 'nanogpt') state.nanogptSelectedModel = model.id;
         const workspace = getActiveWorkspace();
         if (workspace) {
             workspace.providerPreset = {
@@ -224,6 +418,7 @@ const PROVIDERS = {
         el.modelList.querySelectorAll('.model-item').forEach(item => item.classList.toggle('selected', item.dataset.modelId === model.id));
         if (model.context_length) el.contextMax.textContent = formatContextSize(model.context_length);
         updateDeepSeekThinkingUI();
+        updateNanoGptSettingsUI();
         updateStats();
         saveSettings();
     }
@@ -295,6 +490,7 @@ const PROVIDERS = {
         updateProviderStatusUI();
         updateWebSearchUI();
         updateDeepSeekThinkingUI();
+        updateNanoGptSettingsUI();
     }
 
     function updateWebSearchUI() {
@@ -328,6 +524,7 @@ const PROVIDERS = {
         };
         saveSettings();
         updateDeepSeekThinkingUI();
+        updateNanoGptSettingsUI();
     }
 
     function updateDeepSeekThinkingUI() {
@@ -381,7 +578,8 @@ const PROVIDERS = {
             ...(state.providerSettings[state.provider] || {}),
             selectedModelId: state.selectedModel?.id || state.providerSettings[state.provider]?.selectedModelId || null,
             settings: { ...state.settings },
-            thinkingByModel: { ...(state.providerSettings[state.provider]?.thinkingByModel || {}) }
+            thinkingByModel: { ...(state.providerSettings[state.provider]?.thinkingByModel || {}) },
+            ...(state.provider === 'nanogpt' ? { mode: getNanoGptMode() } : {})
         };
         const workspace = getActiveWorkspace();
         if (workspace) {
@@ -428,7 +626,7 @@ const PROVIDERS = {
         }
         setProviderStatus(state.provider, 'testing');
         try {
-            const response = await fetch(`${getProvider().apiBase}/models`, { headers: getAuthHeaders(false) });
+            const response = await fetch(getProviderModelsUrl(), { headers: getAuthHeaders(false) });
             if (!response.ok) throw new Error(await parseApiError(response));
             setProviderStatus(state.provider, 'connected');
             showToast(`${getProvider().label} connection verified`, 'success');
@@ -474,7 +672,7 @@ const PROVIDERS = {
     function buildRequestBody(apiMessages, options = {}) {
         const provider = getProvider();
         const requestBody = {
-            model: state.selectedModel.id,
+            model: state.provider === 'nanogpt' ? buildNanoGptModelId(state.selectedModel.id) : state.selectedModel.id,
             messages: apiMessages,
             temperature: state.settings.temperature,
             max_tokens: state.settings.maxTokens,
@@ -487,6 +685,12 @@ const PROVIDERS = {
         if (state.settings.frequencyPenalty > 0 && state.provider !== 'groq') requestBody.frequency_penalty = state.settings.frequencyPenalty;
         if (state.settings.presencePenalty > 0 && state.provider !== 'groq') requestBody.presence_penalty = state.settings.presencePenalty;
         if (state.provider === 'groq' && requestBody.temperature === 0) requestBody.temperature = 0.00000001;
+        if (state.provider === 'nanogpt') {
+            delete requestBody.stream_options;
+            delete requestBody.top_k;
+            delete requestBody.frequency_penalty;
+            delete requestBody.presence_penalty;
+        }
 
         if (state.webSearchEnabled && provider.searchMode === 'openrouter-tool') {
             requestBody.tools = [{ type: 'openrouter:web_search', parameters: { max_results: 5, search_context_size: 'medium' } }];
@@ -549,6 +753,14 @@ const PROVIDERS = {
             if (status === 400 && /unsupported|not supported|unknown parameter|invalid.*parameter/i.test(detail)) return `Groq rejected an unsupported request parameter. ${detail}`;
             if (/failed to fetch|network|cors/i.test(detail)) return 'Could not reach GroqCloud. Check your network connection and browser CORS access.';
             return `Groq request failed. ${detail}`;
+        }
+        if (state.provider === 'nanogpt') {
+            if (status === 401 || status === 403 || /unauthorized|invalid api key|api key/i.test(detail)) return 'NanoGPT API key was rejected. Check your NanoGPT API key in Settings.';
+            if (status === 402 || /balance|payment|insufficient|credits/i.test(detail)) return 'NanoGPT reports insufficient balance or payment access for this request.';
+            if (status === 404 || /model.*not.*found|does not exist|not found|unavailable/i.test(detail)) return 'NanoGPT could not use that model. Refresh models or choose another NanoGPT model.';
+            if (status === 429 || /rate limit|too many requests/i.test(detail)) return 'NanoGPT rate limit reached. Wait a moment or choose another model.';
+            if (/failed to fetch|network|cors/i.test(detail)) return 'Could not reach NanoGPT. Check your network connection and browser CORS access.';
+            return `NanoGPT request failed. ${detail}`;
         }
         return detail || `${provider.label} request failed`;
     }

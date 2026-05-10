@@ -54,7 +54,7 @@
         try {
             await refreshMcpMemoryContext(state.messages[userMsgIndex]?.content || '');
             const result = await runCompletionWithMcpTools(buildApiMessages(state.messages.slice(0, userMsgIndex + 1)));
-            finalizeStreamingMessage(result.content, result.usage, state.activeStream, result.reasoning);
+            finalizeStreamingMessage(result.content, result.usage, state.activeStream, result.reasoning, result.finishReason);
         } catch (error) {
             handleStreamFailure(error, { removeUserMessage: false, fallback: 'Failed to regenerate' });
         } finally {
@@ -69,13 +69,14 @@
         }
     }
 
-function finalizeStreamingMessage(content, usage = null, stream = state.activeStream, reasoning = null) {
+function finalizeStreamingMessage(content, usage = null, stream = state.activeStream, reasoning = null, finishReason = null) {
         if (!stream?.chatId) return;
         const chat = state.chats[stream.chatId];
         if (!chat) return;
         if (stream.chatId === state.currentChatId) removeStreamingElement();
         const reasoningText = String(reasoning ?? stream.reasoning ?? '').trim();
         const assistantMessage = { role: 'assistant', content, timestamp: Date.now(), attachments: [], usage };
+        if (finishReason) assistantMessage.finishReason = finishReason;
         if (reasoningText) assistantMessage.reasoning = reasoningText;
         if (stream.thinkingRequested) {
             assistantMessage.reasoningRequested = true;
@@ -153,6 +154,9 @@ function finalizeStreamingMessage(content, usage = null, stream = state.activeSt
     // ============================================
 
 async function requestStreamingCompletion(apiMessages, options = {}) {
+        if (typeof canSendNanoGptSelection === 'function' && !canSendNanoGptSelection()) {
+            throw new Error('Selected model is not available in NanoGPT Subscription mode. Refresh models or choose a subscription model.');
+        }
         if (options.includeMcpTools !== false && location.protocol !== 'file:' && typeof getMcpSystemTools === 'function') {
             try {
                 const resp = await getMcpSystemTools();
@@ -170,7 +174,7 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
         }
         const requestBody = buildRequestBody(apiMessages, options);
 
-        const response = await fetch(`${getProvider().apiBase}/chat/completions`, {
+        const response = await fetch(getProviderChatUrl(), {
             method: 'POST',
             headers: getAuthHeaders(true),
             body: JSON.stringify(requestBody),
@@ -178,7 +182,44 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
         });
 
         if (!response.ok) throw new Error(await parseApiError(response));
-        return readStreamingCompletion(response);
+        if (!response.body) return requestNonStreamingCompletion(apiMessages, options);
+        try {
+            return await readStreamingCompletion(response);
+        } catch (error) {
+            if (state.provider !== 'nanogpt' || error.name === 'AbortError') throw error;
+            showToast('NanoGPT streaming failed; retrying without streaming', 'info');
+            return requestNonStreamingCompletion(apiMessages, options);
+        }
+    }
+
+    async function requestNonStreamingCompletion(apiMessages, options = {}) {
+        if (typeof canSendNanoGptSelection === 'function' && !canSendNanoGptSelection()) {
+            throw new Error('Selected model is not available in NanoGPT Subscription mode. Refresh models or choose a subscription model.');
+        }
+        const requestBody = buildRequestBody(apiMessages, options);
+        requestBody.stream = false;
+        delete requestBody.stream_options;
+        const response = await fetch(getProviderChatUrl(), {
+            method: 'POST',
+            headers: getAuthHeaders(true),
+            body: JSON.stringify(requestBody),
+            signal: state.abortController.signal
+        });
+        if (!response.ok) throw new Error(await parseApiError(response));
+        const parsed = await response.json();
+        const message = parsed.choices?.[0]?.message || {};
+        const separated = separateInlineThinking(message.content || '');
+        const reasoning = [
+            extractReasoningFromDelta(message),
+            separated.reasoning
+        ].filter(Boolean).join('\n\n').trim();
+        return {
+            content: separated.content || message.content || '',
+            reasoning,
+            usage: normalizeUsage(parsed.usage),
+            finishReason: parsed.choices?.[0]?.finish_reason || null,
+            toolCalls: parseProviderToolCallsFromMessage(message)
+        };
     }
 
     async function runCompletionWithMcpTools(apiMessages) {
@@ -446,6 +487,7 @@ async function readStreamingCompletion(response) {
         let fullContent = '';
         let fullReasoning = '';
         let usage = null;
+        let finishReason = null;
         let buffer = '';
         const toolCallParts = [];
 
@@ -456,12 +498,17 @@ async function readStreamingCompletion(response) {
             buffer = done ? '' : lines.pop();
 
             for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (!data || data === '[DONE]') continue;
+                if (!line.startsWith('data:')) continue;
+                const data = line.slice(5).trim();
+                if (!data) continue;
+                if (data === '[DONE]') {
+                    buffer = '';
+                    continue;
+                }
                 try {
                     const parsed = JSON.parse(data);
                     if (parsed.usage) usage = normalizeUsage(parsed.usage);
+                    if (parsed.choices?.[0]?.finish_reason) finishReason = parsed.choices[0].finish_reason;
                     const deltaObject = parsed.choices?.[0]?.delta || {};
                     const delta = deltaObject.content;
                     const reasoningDelta = extractReasoningFromDelta(deltaObject);
@@ -495,6 +542,7 @@ async function readStreamingCompletion(response) {
             content: separated.content,
             reasoning,
             usage,
+            finishReason,
             toolCalls: parseProviderToolCallsFromMessage({ tool_calls: toolCallParts.filter(Boolean) })
         };
     }
@@ -503,6 +551,10 @@ async function readStreamingCompletion(response) {
         const content = el.messageInput.value.trim();
         if ((!content && state.attachments.length === 0) || state.isStreaming || !state.selectedModel) return;
         if (!getApiKey()) { openSettings(true); showToast(`Add a ${getProvider().label} API key to continue`, 'error'); return; }
+        if (typeof canSendNanoGptSelection === 'function' && !canSendNanoGptSelection()) {
+            showToast('Selected model is not available in NanoGPT Subscription mode. Refresh models or choose a subscription model.', 'error');
+            return;
+        }
         if (!state.currentChatId) createNewChat();
         const streamChatId = state.currentChatId;
 
@@ -545,7 +597,7 @@ async function readStreamingCompletion(response) {
         try {
             await refreshMcpMemoryContext(userMessage.content || '');
             const result = await runCompletionWithMcpTools(buildApiMessages(state.messages));
-            finalizeStreamingMessage(result.content, result.usage, state.activeStream, result.reasoning);
+            finalizeStreamingMessage(result.content, result.usage, state.activeStream, result.reasoning, result.finishReason);
         } catch (error) {
             handleStreamFailure(error, { removeUserMessage: error.name !== 'AbortError', fallback: 'Failed to send message' });
         } finally {

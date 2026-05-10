@@ -40,6 +40,41 @@
         });
         el.apiKeyInput.addEventListener('change', () => { saveSettings(); fetchModels(); });
         el.testProviderBtn.addEventListener('click', testProviderConnection);
+        if (el.refreshModelsBtn) el.refreshModelsBtn.addEventListener('click', fetchModels);
+        if (el.nanoGptModeSelect) {
+            el.nanoGptModeSelect.addEventListener('change', async (e) => {
+                state.nanogptMode = e.target.value;
+                state.providerSettings.nanogpt = {
+                    ...(state.providerSettings.nanogpt || {}),
+                    mode: state.nanogptMode,
+                    selectedModelId: null
+                };
+                state.selectedModel = null;
+                state.nanogptSelectedModel = '';
+                state.models = getNanoGptModeModels(state.nanogptMode);
+                saveSettings();
+                updateNanoGptSettingsUI();
+                if (state.provider === 'nanogpt') {
+                    renderModelList(state.models);
+                    if (state.models.length) validateNanoGptSelectionForMode(state.nanogptMode, { warn: state.nanogptMode === 'subscription' });
+                    else await fetchModels();
+                }
+            });
+        }
+        if (el.nanoGptOnlineToggle) {
+            el.nanoGptOnlineToggle.addEventListener('change', (e) => {
+                state.nanogptOnlineEnabled = e.target.checked;
+                saveSettings();
+                updateNanoGptSettingsUI();
+            });
+        }
+        if (el.nanoGptMemoryToggle) {
+            el.nanoGptMemoryToggle.addEventListener('change', (e) => {
+                state.nanogptMemoryEnabled = e.target.checked;
+                saveSettings();
+                updateNanoGptSettingsUI();
+            });
+        }
         el.clearLocalKeysBtn.addEventListener('click', clearLocalKeys);
         el.exportSettingsBtn.addEventListener('click', exportEncryptedSettings);
         el.importSettingsBtn.addEventListener('click', () => el.settingsImportInput.click());
