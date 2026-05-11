@@ -5,7 +5,13 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "serve": "node server.js",
+    "dev": "tauri dev",
+    "tauri": "tauri",
+    "tauri:prepare": "node scripts/prepare-tauri-dist.js",
+    "tauri:dev": "tauri dev",
+    "build": "tauri build",
+    "tauri:build": "tauri build",
     "check": "node scripts/check-js.js",
     "test": "node scripts/test-mcp-host.js && node scripts/test-mcp-leak-tester.js && node scripts/bridge-test.js && node scripts/smoke-test.js"
   },
@@ -16,5 +22,8 @@
     "puppeteer": "^24.43.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.1"
   }
 }

@@ -174,6 +174,7 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
             } catch (e) { /* bridge offline — use cached tools */ }
         }
         const requestBody = buildRequestBody(apiMessages, options);
+        logMcpLoopRequest(options.mcpLoop, requestBody);
 
         const response = await fetch(getProviderChatUrl(), {
             method: 'POST',
@@ -200,6 +201,7 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
         const requestBody = buildRequestBody(apiMessages, options);
         requestBody.stream = false;
         delete requestBody.stream_options;
+        logMcpLoopRequest(options.mcpLoop, requestBody);
         const response = await fetch(getProviderChatUrl(), {
             method: 'POST',
             headers: getAuthHeaders(true),
@@ -223,18 +225,185 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
         };
     }
 
+    function isMcpToolCallingUnsupportedForProvider() {
+        return state.provider === 'nanogpt';
+    }
+
+    function isMcpToolCallingGloballyDisabled() {
+        return typeof isMcpToolsEnabled === 'function' && !isMcpToolsEnabled();
+    }
+
+    function warnIfMcpToolCallingUnsupportedForProvider() {
+        if (isMcpToolCallingGloballyDisabled()) return;
+        if (!isMcpToolCallingUnsupportedForProvider()) return;
+        const activeTools = typeof getActiveMcpTools === 'function' ? getActiveMcpTools() : [];
+        if (!activeTools.length) return;
+        const now = Date.now();
+        const lastWarningAt = Number(state.mcpControl?.lastUnsupportedProviderWarningAt || 0);
+        if (now - lastWarningAt < 60000) return;
+        state.mcpControl.lastUnsupportedProviderWarningAt = now;
+        showToast('NanoGPT does not support MCP tool calling here. Switch to OpenRouter, DeepSeek, or Venice to let the assistant use tools.', 'info');
+    }
+
+    function logMcpLoopRequest(loop, requestBody) {
+        if (!loop) return;
+        const messages = requestBody?.messages || [];
+        const validation = validateMcpApiMessages(messages);
+        const details = {
+            stage: loop.stage || 'request',
+            iteration: loop.iteration ?? 0,
+            provider: state.provider,
+            model: state.selectedModel?.id || null,
+            includeMcpTools: loop.includeMcpTools !== false,
+            toolDefinitions: Array.isArray(requestBody?.tools) ? requestBody.tools.length : 0,
+            toolChoice: requestBody?.tool_choice || null,
+            messageCount: messages.length,
+            browserIntent: loop.browserIntent || null,
+            validation
+        };
+        console.log('[Architect MCP loop] outbound messages', details, cloneForMcpLoopLog(messages));
+        if (validation.errors.length || validation.warnings.length) {
+            console.warn('[Architect MCP loop] message history issues', validation);
+        }
+    }
+
+    function cloneForMcpLoopLog(value) {
+        try {
+            if (typeof structuredClone === 'function') return structuredClone(value);
+            return JSON.parse(JSON.stringify(value));
+        } catch (error) {
+            return value;
+        }
+    }
+
+    function validateMcpApiMessages(messages = []) {
+        const errors = [];
+        const warnings = [];
+        const pendingToolCallIds = new Set();
+        const seenToolCallIds = new Set();
+        let previousRole = '';
+
+        messages.forEach((message, index) => {
+            const role = message?.role || '';
+            if (!role) errors.push(`messages[${index}] is missing role`);
+            if (role === 'assistant' && previousRole === 'assistant') {
+                warnings.push(`messages[${index}] is assistant immediately after assistant`);
+            }
+
+            const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+            if (toolCalls.length) {
+                if (role !== 'assistant') errors.push(`messages[${index}] has tool_calls but role is ${role || 'missing'}`);
+                toolCalls.forEach((call, callIndex) => {
+                    const id = String(call?.id || '').trim();
+                    if (!id) {
+                        errors.push(`messages[${index}].tool_calls[${callIndex}] is missing id`);
+                    } else {
+                        if (seenToolCallIds.has(id)) warnings.push(`duplicate tool_call id ${id}`);
+                        seenToolCallIds.add(id);
+                        pendingToolCallIds.add(id);
+                    }
+                    if (!String(call?.function?.name || call?.name || '').trim()) {
+                        errors.push(`messages[${index}].tool_calls[${callIndex}] is missing function name`);
+                    }
+                    if (call?.function && typeof call.function.arguments !== 'string') {
+                        warnings.push(`messages[${index}].tool_calls[${callIndex}].function.arguments is not a string`);
+                    }
+                });
+            }
+
+            if (role === 'tool') {
+                const id = String(message?.tool_call_id || '').trim();
+                if (!id) errors.push(`messages[${index}] tool message is missing tool_call_id`);
+                else if (!pendingToolCallIds.has(id)) errors.push(`messages[${index}] references unknown tool_call_id ${id}`);
+                else pendingToolCallIds.delete(id);
+                if (typeof message?.content !== 'string' && !Array.isArray(message?.content)) {
+                    warnings.push(`messages[${index}] tool content is neither string nor array`);
+                }
+            }
+
+            previousRole = role;
+        });
+
+        for (const id of pendingToolCallIds) errors.push(`tool_call_id ${id} has no matching tool result`);
+        return { ok: errors.length === 0, errors, warnings };
+    }
+
+    function normalizeMcpToolCallIds(toolCalls = []) {
+        return toolCalls.map(call => ({
+            ...call,
+            id: call.id || (typeof generateId === 'function' ? generateId() : `${Date.now()}-${Math.random()}`)
+        }));
+    }
+
+    function reconcileMcpToolCalls(result, mcpDisabled) {
+        if (mcpDisabled) {
+            if (result.toolCalls?.length) {
+                console.warn('[Architect MCP loop] provider returned tool calls while MCP tool calling is disabled', {
+                    provider: state.provider,
+                    count: result.toolCalls.length
+                });
+            }
+            result.toolCalls = [];
+            const stripped = stripFallbackMcpToolMarkup(result.content);
+            if (stripped !== result.content) result.content = stripped;
+            return result;
+        }
+        if (result.toolCalls?.length) {
+            result.toolCalls = normalizeMcpToolCallIds(result.toolCalls);
+            return result;
+        }
+        result.toolCalls = normalizeMcpToolCallIds(parseFallbackMcpToolCall(result.content));
+        if (result.toolCalls.length) {
+            result.content = stripFallbackMcpToolMarkup(result.content);
+            updateStreamingMessage(result.content || 'Using MCP tool...');
+            return result;
+        }
+        const stripped = stripFallbackMcpToolMarkup(result.content);
+        if (stripped !== result.content) result.content = stripped;
+        appendMcpParserErrors();
+        return result;
+    }
+
+    function buildMcpRoundLimitMessage(maxRounds) {
+        return `I stopped after ${maxRounds} MCP tool rounds to avoid an infinite loop. The tool results above are preserved; send a follow-up if you want me to continue from there.`;
+    }
+
+    function shouldLogMcpLoop(includeMcpTools, inferredCalls = []) {
+        if (inferredCalls.length) return true;
+        if (!includeMcpTools) return false;
+        return typeof getActiveMcpTools !== 'function' || getActiveMcpTools().length > 0;
+    }
+
+    function isBrowserMcpToolCall(call = {}) {
+        return /(?:^|:)browser_(?:navigate|screenshot|extract_text)\b/.test(String(call.name || call.toolName || ''));
+    }
+
+    function buildMissingBrowserToolWarning(browserIntent = {}) {
+        const action = browserIntent.toolName === 'browser_extract_text'
+            ? 'read the page'
+            : browserIntent.toolName === 'browser_navigate'
+                ? 'open the page'
+                : 'capture a screenshot';
+        const url = browserIntent.arguments?.url ? ` for ${browserIntent.arguments.url}` : '';
+        return `Model did not use tools, so I did not ${action}${url}. Retry with MCP browser tools enabled or use \`/mcp ${browserIntent.toolName || 'browser_screenshot'} ${browserIntent.arguments?.url || ''}\` directly.`;
+    }
+
     async function runCompletionWithMcpTools(apiMessages) {
         let workingMessages = [...apiMessages];
-        const mcpDisabled = state.mcpControl?.toolCallingMode === 'disabled';
+        const mcpDisabled = isMcpToolCallingGloballyDisabled() || state.mcpControl?.toolCallingMode === 'disabled' || isMcpToolCallingUnsupportedForProvider();
+        if (isMcpToolCallingUnsupportedForProvider()) warnIfMcpToolCallingUnsupportedForProvider();
+        const browserIntent = !mcpDisabled && typeof getMcpBrowserIntentFromMessages === 'function'
+            ? getMcpBrowserIntentFromMessages(workingMessages)
+            : null;
         const inferredCalls = mcpDisabled ? [] : inferMcpToolCallsFromMessages(workingMessages);
-        let usedFallbackTool = false;
+        let browserToolExecuted = false;
         if (inferredCalls.length) {
             removeStreamingElement();
             for (const call of inferredCalls) {
                 const execution = await executeMcpToolCall(call.name, call.arguments || {});
+                if (call.browserIntent || isBrowserMcpToolCall(call)) browserToolExecuted = true;
                 appendVisibleToolResultMessage(execution);
                 workingMessages.push(buildMcpFallbackResultMessage(execution));
-                usedFallbackTool = true;
             }
             syncCurrentChatMessages();
             saveChats();
@@ -242,25 +411,24 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
             addStreamingMessage();
         }
         state.mcpControl.parserErrors = [];
-        let result = await requestStreamingCompletion(workingMessages, { includeMcpTools: !usedFallbackTool && !mcpDisabled });
-        if (!result.toolCalls?.length) {
-            result.toolCalls = parseFallbackMcpToolCall(result.content);
-            if (result.toolCalls.length) {
-                result.content = stripFallbackMcpToolMarkup(result.content);
-                updateStreamingMessage(result.content || 'Using MCP tool...');
-            } else {
-                const stripped = stripFallbackMcpToolMarkup(result.content);
-                if (stripped !== result.content) result.content = stripped;
-                appendMcpParserErrors();
-            }
-        }
-        for (let round = 0; round < MCP_RUNTIME.maxToolRounds && result.toolCalls?.length; round += 1) {
+        const includeMcpTools = !mcpDisabled;
+        const logMcpLoop = shouldLogMcpLoop(includeMcpTools, inferredCalls);
+        let result = await requestStreamingCompletion(workingMessages, {
+            includeMcpTools,
+            mcpLoop: logMcpLoop ? { stage: 'initial', iteration: 0, includeMcpTools, browserIntent } : null
+        });
+        result = reconcileMcpToolCalls(result, mcpDisabled);
+
+        const maxToolRounds = Math.max(1, Number(MCP_RUNTIME.maxToolRounds) || 15);
+        let completedRounds = 0;
+        for (; completedRounds < maxToolRounds && result.toolCalls?.length; completedRounds += 1) {
             removeStreamingElement();
             const assistantToolMessage = buildAssistantToolCallMessage(result.content, result.toolCalls);
             workingMessages.push(assistantToolMessage);
             const toolExecutions = [];
             for (const call of result.toolCalls) {
                 const execution = await executeMcpToolCall(call.name, call.arguments || {});
+                if (browserIntent && isBrowserMcpToolCall(call)) browserToolExecuted = true;
                 execution.providerToolCallId = call.id;
                 toolExecutions.push(execution);
                 workingMessages.push(buildToolResultApiMessage(execution));
@@ -271,19 +439,42 @@ async function requestStreamingCompletion(apiMessages, options = {}) {
             renderMessages();
             addStreamingMessage();
             state.mcpControl.parserErrors = [];
-            result = await requestStreamingCompletion(workingMessages, { includeMcpTools: false });
-            if (!result.toolCalls?.length) {
-                result.toolCalls = parseFallbackMcpToolCall(result.content);
-                if (result.toolCalls.length) {
-                    result.content = stripFallbackMcpToolMarkup(result.content);
-                    updateStreamingMessage(result.content || 'Using MCP tool...');
-                } else {
-                    const stripped = stripFallbackMcpToolMarkup(result.content);
-                    if (stripped !== result.content) result.content = stripped;
-                    appendMcpParserErrors();
-                }
-            }
+            result = await requestStreamingCompletion(workingMessages, {
+                includeMcpTools,
+                mcpLoop: logMcpLoop ? { stage: 'tool-continuation', iteration: completedRounds + 1, includeMcpTools, browserIntent } : null
+            });
+            result = reconcileMcpToolCalls(result, mcpDisabled);
             if (toolExecutions.some(execution => execution.status === 'cancelled')) break;
+        }
+        if (browserIntent && !browserToolExecuted && !result.toolCalls?.length) {
+            result = {
+                ...result,
+                content: buildMissingBrowserToolWarning(browserIntent),
+                finishReason: 'missing_browser_tool_call'
+            };
+            updateStreamingMessage(result.content, result.reasoning);
+            console.warn('[Architect MCP loop] browser intent completed without tool execution', {
+                browserIntent,
+                provider: state.provider,
+                activeBrowserTools: typeof getActiveMcpTools === 'function'
+                    ? getActiveMcpTools().filter(tool => /^browser_/.test(tool.name)).map(tool => tool.name)
+                    : []
+            });
+        }
+        if (result.toolCalls?.length) {
+            const pendingToolCalls = result.toolCalls.length;
+            result = {
+                ...result,
+                content: buildMcpRoundLimitMessage(maxToolRounds),
+                toolCalls: [],
+                finishReason: 'tool_round_limit'
+            };
+            updateStreamingMessage(result.content, result.reasoning);
+            console.warn('[Architect MCP loop] max tool rounds reached', {
+                maxToolRounds,
+                completedRounds,
+                pendingToolCalls
+            });
         }
         return result;
     }

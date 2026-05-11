@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Architect's Domain",
+  "version": "1.0.0",
+  "identifier": "com.hactorixd.architectsdomain",
+  "build": {
+    "beforeDevCommand": "npm run serve",
+    "beforeBuildCommand": "npm run tauri:prepare",
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "../.tauri-dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "Architect's Domain",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "backgroundColor": "#050505",
+        "theme": "Dark"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "HactoriXD",
+    "copyright": "Copyright © 2026 HactoriXD",
+    "category": "Productivity",
+    "shortDescription": "Local-first multi-model AI workstation",
+    "longDescription": "Architect's Domain is a local-first multi-model AI workstation built with HTML, CSS, JavaScript, and a minimal Tauri desktop shell."
+  }
+}

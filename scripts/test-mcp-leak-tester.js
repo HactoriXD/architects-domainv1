@@ -130,6 +130,17 @@ const cases = [
     expectedVisible: ''
   },
   {
+    name: 'single-pipe malformed DSML screenshot leak',
+    text: `< | DSML | tool_calls>
+< | DSML | invoke name="moygyttblcynlzwlcbg__browser_screenshot">
+< | DSML | parameter name="url" string="true">http://localhost:3000/
+< | DSML | parameter>
+< | DSML | invoke>
+< | DSML | tool_calls>`,
+    expectedTools: ['browser_screenshot'],
+    expectedVisible: ''
+  },
+  {
     name: 'HTML-escaped DSML no-argument screenshot leak',
     text: `&lt; | | DSML | | tool_calls&gt;
 &lt; | | DSML | | invoke name=&quot;moygttblcynlzwlcbg__browser_screenshot&quot;&gt;

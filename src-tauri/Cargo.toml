@@ -1,0 +1,17 @@
+[package]
+name = "architects-domain"
+version = "1.0.0"
+description = "Architect's Domain desktop shell"
+authors = ["Architect's Domain"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "architects_domain_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

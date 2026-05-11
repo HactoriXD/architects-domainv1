@@ -180,9 +180,8 @@ const PROVIDERS = {
     }
 
     function labelNanoGptModelForMode(model, mode = getNanoGptMode()) {
-        const label = getNanoGptModeLabel(mode);
         const rawName = String(model.name || model.id || '').replace(/^NanoGPT(?:\s+Subscription|\s+Paid)?\s*[·Â]\s*/i, '').trim();
-        return { ...model, name: `${label} · ${rawName}`, nanogptMode: mode };
+        return { ...model, name: rawName, nanogptMode: mode };
     }
 
     function applyNanoGptModelCache(models, mode = getNanoGptMode()) {
@@ -355,6 +354,7 @@ const PROVIDERS = {
             const traits = getModelTraits(m);
             const modelId = escapeHtml(m.id);
             const modelName = escapeHtml(m.name || m.id);
+            const modelTitle = escapeHtml(m.name || m.id);
             const providerBadge = state.provider === 'groq'
                 ? '<span class="model-badge groq">GroqCloud</span>'
                 : state.provider === 'nanogpt'
@@ -369,8 +369,8 @@ const PROVIDERS = {
                 traits.roleplay ? '<span class="model-badge roleplay">Roleplay</span>' : ''
             ].join('');
             const displayCostMeta = oneMessageCost === 'Provider pricing' ? 'Provider pricing' : `${oneMessageCost}/1K+1K`;
-            return `<div class="model-item ${state.selectedModel?.id === m.id ? 'selected' : ''}" data-model-id="${modelId}">
-                <div class="model-item-header"><div class="model-item-name"><span>${modelName}</span>${badges}</div><span class="model-item-context">${ctx} ctx</span></div>
+            return `<div class="model-item ${state.selectedModel?.id === m.id ? 'selected' : ''}" data-model-id="${modelId}" title="${modelTitle}">
+                <div class="model-item-header"><div class="model-item-name"><span title="${modelTitle}">${modelName}</span>${badges}</div><span class="model-item-context">${ctx} ctx</span></div>
                 <div class="model-item-meta">${getProvider().badge || getProvider().label} &middot; ${tokenPricing} &middot; ${displayCostMeta}</div></div>`;
         }).join('');
         if (state.provider === 'openrouter') {
@@ -426,16 +426,8 @@ const PROVIDERS = {
     function updateSelectedModelCostDisplay() {
         if (!state.selectedModel || !el.selectedModelName) return;
         const name = (state.selectedModel.name || state.selectedModel.id).replace(/^[^:]+:\s*/, '');
-        const inputTokens = estimateCurrentInputTokens();
-        const outputTokens = Number(state.settings.maxTokens) || 0;
-        const cost = formatEstimatedMessageCost(state.selectedModel, inputTokens, outputTokens);
-        if (cost === 'Provider pricing') {
-            el.selectedModelName.textContent = `${name} · Provider pricing`;
-            el.selectedModelName.title = `${formatTokenPricing(state.selectedModel)}. Pricing is shown in the provider console.`;
-            return;
-        }
-        el.selectedModelName.textContent = `${name} · ~${cost}/msg`;
-        el.selectedModelName.title = `${formatTokenPricing(state.selectedModel)}. Message estimate uses current context plus max output tokens.`;
+        el.selectedModelName.textContent = name;
+        el.selectedModelName.title = name;
     }
 
     function estimateCurrentInputTokens() {

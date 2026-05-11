@@ -262,9 +262,13 @@ function parseDsmParameters(body) {
     for (const parameter of extractDsmTaggedBlocks(body, 'parameter')) {
         const name = extractMcpXmlAttribute(parameter.attributes, 'name');
         if (!name || !allowed.has(name)) continue;
-        args[name] = decodeDsmParameterValue(parameter.body);
+        args[name] = decodeDsmParameterValue(trimDsmParameterBody(parameter.body));
     }
     return args;
+}
+
+function trimDsmParameterBody(value) {
+    return String(value || '').split(/<\s*\/?\s*(?:\|\s*)+(?:(?:DSM|DSML)\s*(?:\|\s*)+)?(?:tool_calls|invoke|parameter)\b/i)[0];
 }
 
 function decodeDsmParameterValue(value) {
@@ -743,11 +747,70 @@ function buildMcpToolListSummary() {
     return lines.join('\n\n');
 }
 
-function inferMcpToolCallsFromMessages(messages) {
+function getMcpMessageText(message = {}) {
+    if (typeof message.content === 'string') return message.content;
+    if (Array.isArray(message.content)) {
+        return message.content
+            .map(part => typeof part === 'string' ? part : (part?.text || part?.content || ''))
+            .filter(Boolean)
+            .join('\n');
+    }
+    return JSON.stringify(message.content || '');
+}
+
+function getLastMcpUserText(messages = []) {
     const lastUser = [...messages].reverse().find(message => message.role === 'user');
-    const text = typeof lastUser?.content === 'string'
-        ? lastUser.content.toLowerCase()
-        : JSON.stringify(lastUser?.content || '').toLowerCase();
+    return lastUser ? getMcpMessageText(lastUser) : '';
+}
+
+function normalizeMcpBrowserIntentUrl(raw) {
+    let value = String(raw || '').trim().replace(/[)\].,!?;:]+$/g, '');
+    if (!value) return '';
+    if (/^localhost(?::\d+)?(?:\/.*)?$/i.test(value) || /^127\.0\.0\.1(?::\d+)?(?:\/.*)?$/i.test(value)) {
+        value = `http://${value.replace(/\/?$/, '/')}`;
+    } else if (!/^https?:\/\//i.test(value)) {
+        value = `https://${value}`;
+    }
+    return value;
+}
+
+function extractMcpBrowserIntentUrl(text = '') {
+    const match = String(text || '').match(/\bhttps?:\/\/[^\s<>()"'`]+|\blocalhost(?::\d+)?(?:\/[^\s<>()"'`]*)?|\b127\.0\.0\.1(?::\d+)?(?:\/[^\s<>()"'`]*)?|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:\/[^\s<>()"'`]*)?/i);
+    return normalizeMcpBrowserIntentUrl(match?.[0] || '');
+}
+
+function getMcpBrowserIntentFromText(text = '') {
+    const source = String(text || '');
+    const lower = source.toLowerCase();
+    const url = extractMcpBrowserIntentUrl(source);
+    if (!url) return null;
+    const hasBrowserAction = /\b(browser|screenshot|screen\s*shot|capture|snapshot|snap|see|look(?:\s+at)?|visual(?:ly)?|inspect\s+visually|open|navigate|go\s+to|visit|extract(?:\s+text)?|read(?:\s+the)?\s+page|page\s+text)\b/i.test(source);
+    if (!hasBrowserAction) return null;
+    let toolName = 'browser_screenshot';
+    if (/\b(extract(?:\s+text)?|read(?:\s+the)?\s+page|page\s+text)\b/.test(lower)) {
+        toolName = 'browser_extract_text';
+    } else if (/\b(open|navigate|go\s+to|visit)\b/.test(lower) && !/\b(screenshot|screen\s*shot|capture|snapshot|snap|see|look|visual|inspect\s+visually)\b/.test(lower)) {
+        toolName = 'browser_navigate';
+    }
+    return { toolName, arguments: { url } };
+}
+
+function getMcpBrowserIntentFromMessages(messages = []) {
+    return getMcpBrowserIntentFromText(getLastMcpUserText(messages));
+}
+
+function inferMcpBrowserToolCallFromMessages(messages = []) {
+    const intent = getMcpBrowserIntentFromMessages(messages);
+    if (!intent) return null;
+    const tool = getActiveMcpTools().find(item => item.name === intent.toolName);
+    return tool ? { id: generateId(), name: getMcpToolQualifiedName(tool), arguments: intent.arguments, browserIntent: true } : null;
+}
+
+function inferMcpToolCallsFromMessages(messages) {
+    const browserCall = inferMcpBrowserToolCallFromMessages(messages);
+    if (browserCall) return [browserCall];
+
+    const text = getLastMcpUserText(messages).toLowerCase();
     if (!text || !/\b(mcp|tool|github|repo|repository|issues?|commits?|files?|readme|access|health|bridge|port|git|diff|changed|status|fetch|url|website|notes?|vault)\b/.test(text)) return [];
 
     const tools = getActiveMcpTools();

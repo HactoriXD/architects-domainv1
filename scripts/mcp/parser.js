@@ -347,9 +347,13 @@
         for (const parameter of extractDsmTaggedBlocks(body, 'parameter')) {
             const name = extractAttribute(parameter.attributes, 'name');
             if (!name || !allowed.has(name)) continue;
-            args[name] = decodeEntities(parameter.body).trim();
+            args[name] = decodeEntities(trimDsmParameterBody(parameter.body)).trim();
         }
         return args;
+    }
+
+    function trimDsmParameterBody(value) {
+        return String(value || '').split(/<\s*\/?\s*(?:\|\s*)+(?:(?:DSM|DSML)\s*(?:\|\s*)+)?(?:tool_calls|invoke|parameter)\b/i)[0];
     }
 
     function extractFencedJson(text) {

@@ -84,6 +84,7 @@ function buildMcpToolSummaries(limit = 20) {
 }
 
 function buildProviderToolDefinitions() {
+    if (typeof isMcpToolsEnabled === 'function' && !isMcpToolsEnabled()) return [];
     if (state.mcpControl?.toolCallingMode && state.mcpControl.toolCallingMode !== 'native') return [];
     return getActiveMcpTools().slice(0, 64).map(tool => ({
         type: 'function',

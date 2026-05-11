@@ -2,7 +2,9 @@
 // ============================================
 function buildMcpRuntimeContextMessage() {
     const mode = state.mcpControl?.toolCallingMode || 'native';
+    if (typeof isMcpToolsEnabled === 'function' && !isMcpToolsEnabled()) return null;
     if (mode === 'disabled') return null;
+    if (state.provider === 'nanogpt') return null;
     const tools = buildMcpToolSummaries(24);
     if (!tools.length) return null;
     const lines = tools.map(tool => `- ${tool.name}: ${tool.server} / ${tool.displayName} (${tool.safety}) - ${tool.description || 'No description'}`);

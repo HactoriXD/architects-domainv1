@@ -3,7 +3,7 @@
 const MCP_RUNTIME = {
     protocolVersion: '2024-11-05',
     toolTimeoutMs: 25000,
-    maxToolRounds: 3
+    maxToolRounds: 15
 };
 
 function normalizeMcpServerRecord(server) {

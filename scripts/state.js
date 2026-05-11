@@ -439,8 +439,8 @@
         }
         if (Number.isFinite(rawPromptNumber) && Number.isFinite(rawCompletionNumber)) {
             return {
-                input: rawPromptNumber * 1000,
-                output: rawCompletionNumber * 1000,
+                input: normalizeRawModelPriceToPer1K(rawPromptNumber),
+                output: normalizeRawModelPriceToPer1K(rawCompletionNumber),
                 estimated: Boolean(model.pricing?.estimated),
                 source: model.pricing?.source || 'provider'
             };
@@ -470,20 +470,34 @@
         };
     }
 
+    function normalizeRawModelPriceToPer1K(value) {
+        if (!Number.isFinite(value)) return 'provider';
+        if (value === 0) return 0;
+        if (value >= 1) return value / 1000;
+        if (value >= 0.001) return value;
+        return value * 1000;
+    }
+
     function formatTokenPricing(model) {
         if (model.pricing_note || model.input_cost_per_1k_tokens === 'provider' || model.output_cost_per_1k_tokens === 'provider') {
             return model.pricing_note || 'Provider pricing';
         }
         const suffix = model.pricing_estimated ? ' est.' : '';
-        return `In ${formatPer1KCost(model.input_cost_per_1k_tokens)}/1K · Out ${formatPer1KCost(model.output_cost_per_1k_tokens)}/1K${suffix}`;
+        return `In ${formatPer1KCost(normalizePer1KModelCost(model.input_cost_per_1k_tokens))}/1K · Out ${formatPer1KCost(normalizePer1KModelCost(model.output_cost_per_1k_tokens))}/1K${suffix}`;
     }
 
     function estimateMessageCost(model, inputTokens, outputTokens) {
         if (!model) return null;
         if (model.pricing_note || model.input_cost_per_1k_tokens === 'provider' || model.output_cost_per_1k_tokens === 'provider') return 'provider';
-        const inputCost = (Math.max(0, inputTokens || 0) / 1000) * Number(model.input_cost_per_1k_tokens || 0);
-        const outputCost = (Math.max(0, outputTokens || 0) / 1000) * Number(model.output_cost_per_1k_tokens || 0);
+        const inputCost = (Math.max(0, inputTokens || 0) / 1000) * Number(normalizePer1KModelCost(model.input_cost_per_1k_tokens) || 0);
+        const outputCost = (Math.max(0, outputTokens || 0) / 1000) * Number(normalizePer1KModelCost(model.output_cost_per_1k_tokens) || 0);
         return inputCost + outputCost;
+    }
+
+    function normalizePer1KModelCost(value) {
+        const cost = Number(value);
+        if (!Number.isFinite(cost)) return value;
+        return cost >= 1 ? cost / 1000 : cost;
     }
 
     function formatEstimatedMessageCost(model, inputTokens, outputTokens) {

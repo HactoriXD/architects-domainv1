@@ -5,3 +5,5 @@ server.log
 mcp-config.json
 mcp-memory.json
 mcp-audit.log
+src-tauri/target/
+.tauri-dist/

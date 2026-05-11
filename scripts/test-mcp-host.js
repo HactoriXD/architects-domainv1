@@ -104,6 +104,7 @@ vm.createContext(context);
 for (const file of [
   'scripts/mcp/host.js',
   'scripts/mcp/parser.js',
+  'scripts/mcp/tool-router.js',
   'scripts/mcp/commands.js',
   'scripts/mcp/executor.js',
   'scripts/mcp/renderer.js',
@@ -226,9 +227,26 @@ async function main() {
   assert.deepEqual(parsed.calls[0].arguments, {});
   assert.equal(parsed.visibleText, '');
 
+  parsed = MCP.parseModelToolCalls('< | DSML | tool_calls>\n< | DSML | invoke name="moygyttblcynlzwlcbg__browser_screenshot">\n< | DSML | parameter name="url" string="true">http://localhost:3000/\n< | DSML | parameter>\n< | DSML | invoke>\n< | DSML | tool_calls>');
+  assert.deepEqual(names(parsed.calls), ['builtin-browser:browser_screenshot']);
+  assert.equal(parsed.calls[0].arguments.url, 'http://localhost:3000/');
+  assert.equal(parsed.visibleText, '');
+
   parsed = MCP.parseModelToolCalls('```json\n{"tool_name":"browser_navigate","arguments":{"url":"http://localhost:3000/"}}\n```');
   assert.deepEqual(names(parsed.calls), ['builtin-browser:browser_navigate']);
   assert.equal(parsed.visibleText, '');
+
+  let inferred = context.inferMcpToolCallsFromMessages([{ role: 'user', content: 'screenshot example.com' }]);
+  assert.deepEqual(names(inferred), ['builtin-browser:browser_screenshot']);
+  assert.equal(inferred[0].arguments.url, 'https://example.com');
+
+  inferred = context.inferMcpToolCallsFromMessages([{ role: 'user', content: 'read the page text from https://example.com/docs' }]);
+  assert.deepEqual(names(inferred), ['builtin-browser:browser_extract_text']);
+  assert.equal(inferred[0].arguments.url, 'https://example.com/docs');
+
+  inferred = context.inferMcpToolCallsFromMessages([{ role: 'user', content: 'open localhost:3000' }]);
+  assert.deepEqual(names(inferred), ['builtin-browser:browser_navigate']);
+  assert.equal(inferred[0].arguments.url, 'http://localhost:3000/');
 
   parsed = MCP.parseModelToolCalls('<tool_calls name="browser_screenshot">{"url":"http://localhost:3000/",}</tool_calls>');
   assert.equal(parsed.calls[0].name, 'builtin-browser:browser_screenshot');
