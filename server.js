@@ -21,6 +21,13 @@ const MIME_TYPES = {
 
 const server = http.createServer(async (req, res) => {
   try {
+    applyCorsHeaders(res);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (await handleBridgeRequest(req, res, url)) {
       return;
@@ -83,4 +90,10 @@ function sendText(res, status, text) {
     'Cache-Control': 'no-store'
   });
   res.end(text);
+}
+
+function applyCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
 }

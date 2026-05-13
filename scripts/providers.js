@@ -538,7 +538,7 @@ const PROVIDERS = {
             el.deepSeekThinkingButton.classList.toggle('active', thinkingEnabled);
             el.deepSeekThinkingButton.classList.toggle('generating', thinkingEnabled && state.isStreaming);
             el.deepSeekThinkingButton.setAttribute('aria-pressed', String(thinkingEnabled));
-            el.deepSeekThinkingButtonLabel.textContent = thinkingEnabled ? 'THINKING ON' : 'THINKING OFF';
+            el.deepSeekThinkingButtonLabel.textContent = thinkingEnabled ? 'Thinking On' : 'Thinking Off';
             if (el.thinkingProviderLabel) el.thinkingProviderLabel.textContent = provider.label;
             el.deepSeekThinkingButton.title = thinkingEnabled
                 ? state.isStreaming

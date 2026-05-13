@@ -32,7 +32,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "msi"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
     "publisher": "HactoriXD",
     "copyright": "Copyright © 2026 HactoriXD",
     "category": "Productivity",

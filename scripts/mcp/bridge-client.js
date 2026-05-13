@@ -3,7 +3,8 @@
 function getBridgeBaseUrl(server = {}) {
     const endpoint = String(server.endpoint || '').trim();
     if (endpoint) return endpoint.replace(/\/+$/, '');
-    return location.protocol === 'file:' ? '' : `${location.origin}/bridge`;
+    const origin = getLocalBridgeOrigin();
+    return origin ? `${origin}/bridge` : '';
 }
 
 function isBridgeServer(server = {}) {
@@ -35,7 +36,17 @@ async function bridgeHealth(server = {}) {
 }
 
 function getMcpSystemBaseUrl() {
-    return location.protocol === 'file:' ? '' : `${location.origin}/mcp`;
+    const origin = getLocalBridgeOrigin();
+    return origin ? `${origin}/mcp` : '';
+}
+
+function getLocalBridgeOrigin() {
+    if (location.protocol === 'file:') return '';
+    if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return location.origin;
+    if (location.hostname === 'tauri.localhost' || location.protocol === 'tauri:' || location.protocol === 'asset:') {
+        return 'http://127.0.0.1:3000';
+    }
+    return location.origin;
 }
 
 async function mcpSystemRequest(path, options = {}) {

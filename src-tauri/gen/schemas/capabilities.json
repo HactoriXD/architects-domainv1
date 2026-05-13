@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default desktop window capability set with no filesystem, shell, or secret-store access.","local":true,"windows":["main"],"permissions":[]}}
